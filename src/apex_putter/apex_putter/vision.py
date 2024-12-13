@@ -31,11 +31,14 @@ import apex_putter.transform_operations as transOps
 from apex_putter_interfaces.msg import DetectionArray
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import TransformStamped
+
 import numpy as np
 import pyrealsense2 as rs
 import rclpy
 from rclpy.node import Node
+
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile
+
 from sensor_msgs.msg import CameraInfo, Image
 import tf2_ros
 from visualization_msgs.msg import Marker
@@ -43,13 +46,14 @@ from visualization_msgs.msg import Marker
 
 class Vision(Node):
     def __init__(self):
+        """Initialize the Vision node."""
         super().__init__('vision')
-
         self.bridge = CvBridge()
 
         # RS parameters
         self.intrinsics = None
         self._depth_info_topic = '/camera/camera/color/camera_info'
+
         self._depth_image_topic = \
             '/camera/camera/aligned_depth_to_color/image_raw'
         self._colored_image_topic = '/camera/camera/color/image_raw'
@@ -59,13 +63,13 @@ class Vision(Node):
 
         # Image subscribers
         self.sub_depth = self.create_subscription(
-            Image, self._depth_image_topic, self.imageDepthCallback, 1
+            Image, self._depth_image_topic, self.image_depth_callback, 1
         )
         self.sub_depth_info = self.create_subscription(
-            CameraInfo, self._depth_info_topic, self.imageDepthInfoCallback, 1
+            CameraInfo, self._depth_info_topic, self.image_depth_info_callback, 1
         )
         self.sub_color = self.create_subscription(
-            Image, self._colored_image_topic, self.imageColorCallback, 1
+            Image, self._colored_image_topic, self.image_color_callback, 1
         )
 
         # Known transform from apriltag to robot base
@@ -93,7 +97,7 @@ class Vision(Node):
         self.atag_to_rbf_transform.rotation.w = 0.5158735921722442
 
         # TF listener
-        self.tf_buffer = tf2_ros.buffer.Buffer()
+        self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self.rbf_publisher = self.create_publisher(
@@ -105,7 +109,7 @@ class Vision(Node):
         # Dynamic broadcaster for robot base frame
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
-        # Static broadcaster for robot base frame to actual base frame
+        # Static broadcaster for robot base frame
         self.static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
         self.ball_detection_sub = self.create_subscription(
@@ -123,28 +127,18 @@ class Vision(Node):
 
         self.timer = self.create_timer(0.001, self.timer_callback)
 
-        markerQoS = QoSProfile(
-            depth=10, durability=QoSDurabilityPolicy.VOLATILE)
+        marker_qos = rclpy.qos.QoSProfile(
+            depth=10, durability=rclpy.qos.QoSDurabilityPolicy.VOLATILE
+        )
         self.ball_marker_publisher = self.create_publisher(
-            Marker, 'ball_marker', markerQoS)
+            Marker, 'ball_marker', marker_qos
+        )
 
-        self.get_logger().info('Vision node started')
+        self.get_logger().info('Vision node started.')
 
-    def imageDepthCallback(self, data):
-        """
-        Obtain latest depth image.
-
-        Args:
-        ----
-            data (Image): Depth image message.
-
-        Returns
-        -------
-            None
-
-        """
+    def image_depth_callback(self, data):
+        """Obtain the latest depth image."""
         try:
-
             cv_image = self.bridge.imgmsg_to_cv2(data, data.encoding)
             self._latest_depth_img = cv_image
         except CvBridgeError as e:
@@ -154,25 +148,16 @@ class Vision(Node):
         except ValueError as e:
             self.get_logger().error(
                 'ValueError in imageDepthCallback: {}'.format(e))
+            
             return
 
-    def imageDepthInfoCallback(self, cameraInfo):
-        """
-        Obtain depth camera information.
-
-        Args:
-        ----
-            cameraInfo (CameraInfo): Camera information message.
-
-        Returns
-        -------
-            None
-
-        """
+    def image_depth_info_callback(self, camera_info):
+        """Obtain depth camera information."""
         try:
             if self.intrinsics:
                 return
             self.intrinsics = rs.intrinsics()
+
             self.intrinsics.width = cameraInfo.width
             self.intrinsics.height = cameraInfo.height
             self.intrinsics.ppx = cameraInfo.k[2]
@@ -191,7 +176,7 @@ class Vision(Node):
                 f'intrinsics_width: {self.intrinsics.width}, \
                     depth_y: {self.intrinsics.height}')
         except CvBridgeError as e:
-            print(e)
+            self.get_logger().error('CvBridgeError in image_depth_info_callback: {}'.format(e))
             return
 
     def imageColorCallback(self, data):
@@ -201,21 +186,19 @@ class Vision(Node):
         Args:
         ----
             data (Image): Color image message.
-
-        Returns
-        -------
-            None
-
         """
+
+    def image_color_callback(self, data):
+        """Obtain the latest color image."""
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, 'bgr8')
             self._latest_color_img = cv_image
             self._latest_color_img_ts = data.header.stamp
         except CvBridgeError as e:
-            print(e)
+            self.get_logger().error('CvBridgeError in image_color_callback: {}'.format(e))
             return
         except ValueError as e:
-            print(e)
+            self.get_logger().error('ValueError in image_color_callback: {}'.format(e))
             return
 
     def publish_rbf(self):
@@ -225,7 +208,6 @@ class Vision(Node):
         robot_base_transform.header.frame_id = 'robot_base_tag'
         robot_base_transform.child_frame_id = 'robot_base_frame'
         robot_base_transform.transform = self.atag_to_rbf_transform
-
         self.rbf_publisher.publish(robot_base_transform)
         self.static_broadcaster.sendTransform(robot_base_transform)
 
@@ -234,7 +216,6 @@ class Vision(Node):
         rbf_to_base_transform.header.stamp = self.get_clock().now().to_msg()
         rbf_to_base_transform.header.frame_id = 'robot_base_frame'
         rbf_to_base_transform.child_frame_id = 'base'
-
         self.static_broadcaster.sendTransform(rbf_to_base_transform)
 
     def deproject_depth_point(self, x, y):
@@ -252,11 +233,10 @@ class Vision(Node):
 
         """
         if (
-            self.intrinsics
-            and self._latest_depth_img is not None
-            and self._latest_color_img is not None
+            self.intrinsics and
+            self._latest_depth_img is not None and
+            self._latest_color_img is not None
         ):
-
             depth_x = int(x)
             depth_y = int(y)
             # self.get_logger().info(f"depth_x: {depth_x}, depth_y: {depth_y}")
@@ -266,7 +246,6 @@ class Vision(Node):
                 self.intrinsics, [x, y], depth)
 
             x_new, y_new, z_new = result[0], result[1], result[2]
-
             return x_new, y_new, z_new
 
     def ball_detection_callback(self, msg):
@@ -278,15 +257,15 @@ class Vision(Node):
             self.get_logger().debug(
                 f'Detected ball at ({detection.x}, {detection.y})')
             # Create a 1x2 array for the current detection
+
             ball_detected = np.array([[detection.x, detection.y]])
-            # Append as a new row
             balls_detected = np.vstack((balls_detected, ball_detected))
 
         self.balls_detected_array = balls_detected
         # self.get_logger().info(
         #     f"Ball detected at {self.balls_detected_array}")
 
-        # Now deproject into 3D
+        # Deproject into 3D
         balls_camera_frame = np.empty((0, 3))
         compensated_bcf = np.empty((0, 3))
         if self.balls_detected_array is not None:
@@ -307,20 +286,7 @@ class Vision(Node):
         self.compensated_balls_in_camera_frame = compensated_bcf
 
     def create_ball_marker(self, x, y, z):
-        """
-        Create a ball marker for RViz.
-
-        Args:
-        ----
-            x (float): X-coordinate.
-            y (float): Y-coordinate.
-            z (float): Z-coordinate.
-
-        Returns
-        -------
-            Marker: Ball marker.
-
-        """
+        """Create a ball marker for RViz."""
         marker = Marker()
         marker.header.frame_id = 'camera_color_optical_frame'
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -328,23 +294,16 @@ class Vision(Node):
         marker.id = 0
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
-
-        # Position
         marker.pose.position.x = x
         marker.pose.position.y = y
         marker.pose.position.z = z
-
-        # Dimension
         marker.scale.x = 0.05
         marker.scale.y = 0.05
         marker.scale.z = 0.05
-
-        # Color - setting to red
         marker.color.a = 0.7
         marker.color.r = 0.8
         marker.color.g = 0.0
         marker.color.b = 0.2
-
         return marker
 
     def drop_ball_marker(self):
@@ -393,7 +352,6 @@ class Vision(Node):
                 camera_to_ball_transform.transform.translation.x = x
                 camera_to_ball_transform.transform.translation.y = y
                 camera_to_ball_transform.transform.translation.z = z
-
                 self.tf_broadcaster.sendTransform(camera_to_ball_transform)
 
     def publish_target_transform(self):
@@ -402,6 +360,7 @@ class Vision(Node):
         try:
             tag15_transform = self.tf_buffer.lookup_transform(
                 'camera_color_optical_frame', 'tag_15', rclpy.time.Time())
+
             tag15_dx = tag15_transform.transform.translation.x
             tag15_dy = tag15_transform.transform.translation.y
             tag15_dz = tag15_transform.transform.translation.z
@@ -423,6 +382,7 @@ class Vision(Node):
             self.get_logger().debug(f'Error looking up tag_15 transform: {e}')
 
     def timer_callback(self):
+        """Timer callback to publish transforms and markers."""
         self.publish_rbf()
         self.drop_ball_marker()
         self.publish_ball_transform()
@@ -430,12 +390,10 @@ class Vision(Node):
 
 
 def main(args=None):
+    """Entry point for the vision node."""
     rclpy.init(args=args)
-
     vision = Vision()
-
     rclpy.spin(vision)
-
     vision.destroy_node()
     rclpy.shutdown()
 
