@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class BallTrajectoryCalculator:
     def __init__(self, ball_position, hole_position):
         self.ball_position = np.array(ball_position)

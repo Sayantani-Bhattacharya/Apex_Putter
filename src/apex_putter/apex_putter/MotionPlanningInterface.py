@@ -1,7 +1,7 @@
-from geometry_msgs.msg import Pose
 from apex_putter.MotionPlanner import MotionPlanner
 from apex_putter.PlanningSceneClass import PlanningSceneClass
 from apex_putter.RobotState import RobotState
+from geometry_msgs.msg import Pose
 from moveit_msgs.msg import RobotState as RobotStateObj
 from rclpy.node import Node
 

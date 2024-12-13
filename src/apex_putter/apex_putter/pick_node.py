@@ -3,25 +3,23 @@ Picks up and moves an object in Gazebo.
 
 SERVICES:
     + /pick (some_type) - picks up the object and moves it
-
-
 """
 
 from enum import auto, Enum
 
-from geometry_msgs.msg import Pose, Quaternion, TransformStamped
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
-import apex_putter.transform_operations as transOps
+from geometry_msgs.msg import Pose, Quaternion, TransformStamped
+
 import numpy as np
 import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
+
 from std_srvs.srv import Empty
-import modern_robotics as mr
-import apex_putter.transform_operations as to
+
 from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
+from tf2_ros.transform_listener import TransformListener
 
 
 def quaternion_to_rotation_matrix(q: Quaternion):
@@ -32,9 +30,9 @@ def quaternion_to_rotation_matrix(q: Quaternion):
     w = q.w
 
     R = np.array([
-        [1 - 2*(y**2 + z**2), 2*(x*y - z*w), 2*(x*z + y*w)],
-        [2*(x*y + z*w), 1 - 2*(x**2 + z**2), 2*(y*z - x*w)],
-        [2*(x*z - y*w), 2*(y*z + x*w), 1 - 2*(x**2 + y**2)]
+        [1 - 2*(y**2 + z**2),     2*(x*y - z*w),     2*(x*z + y*w)],
+        [2*(x*y + z*w),           1 - 2*(x**2 + z**2), 2*(y*z - x*w)],
+        [2*(x*z - y*w),           2*(y*z + x*w),     1 - 2*(x**2 + y**2)]
     ])
 
     return R
@@ -71,7 +69,7 @@ def rotation_matrix_to_quaternion(R):
 
 def quaternion_from_euler(ai, aj, ak):
     """
-    Convert from euler angles of to a quaternion.
+    Convert from euler angles to a quaternion.
 
     Args:
     ----
@@ -81,7 +79,7 @@ def quaternion_from_euler(ai, aj, ak):
 
     Return:
     ------
-    A Quaternion corresponding to the rotation
+        A Quaternion corresponding to the rotation
 
     """
     ai /= 2.0
@@ -98,7 +96,7 @@ def quaternion_from_euler(ai, aj, ak):
     sc = si*ck
     ss = si*sk
 
-    q = np.empty((4, ))
+    q = np.empty((4,))
     q[0] = cj*sc - sj*cs
     q[1] = cj*ss + sj*cc
     q[2] = cj*cs - sj*sc
@@ -115,23 +113,19 @@ def quaternion_difference(q1: Quaternion, q2: Quaternion):
     q2_mag = np.linalg.norm(q2)
     q2_inv = q_star / q2_mag
 
-    w = q1[3] * q2_inv[3] - q1[0] * q2_inv[0] - \
-        q1[1] * q2_inv[1] - q1[2] * q2_inv[2]
-    x = q1[3] * q2_inv[0] + q1[0] * q2_inv[3] + \
-        q1[1] * q2_inv[2] - q1[2] * q2_inv[1]
-    y = q1[3] * q2_inv[1] - q1[0] * q2_inv[2] + \
-        q1[1] * q2_inv[3] + q1[2] * q2_inv[0]
-    z = q1[3] * q2_inv[2] + q1[0] * q2_inv[1] - \
-        q1[1] * q2_inv[0] + q1[2] * q2_inv[3]
+    w = q1[3] * q2_inv[3] - q1[0] * q2_inv[0] - q1[1] * q2_inv[1] - q1[2] * q2_inv[2]
+    x = q1[3] * q2_inv[0] + q1[0] * q2_inv[3] + q1[1] * q2_inv[2] - q1[2] * q2_inv[1]
+    y = q1[3] * q2_inv[1] - q1[0] * q2_inv[2] + q1[1] * q2_inv[3] + q1[2] * q2_inv[0]
+    z = q1[3] * q2_inv[2] + q1[0] * q2_inv[1] - q1[1] * q2_inv[0] + q1[2] * q2_inv[3]
 
     q_diff = np.array([x, y, z, w])
-
     return q_diff
 
 
 def rotate_quaternion(q1: Quaternion, q2: Quaternion):
-    q1 = np.array([q1.x, q1.y, q1.z, q1.w])
-    q2 = np.array([q2.x, q2.y, q2.z, q2.w])
+    # This function is defined but not implemented here.
+    # If needed, implement the rotation logic or remove the function.
+    pass
 
 
 class State(Enum):
@@ -222,18 +216,23 @@ class PickNode(Node):
         t.transform.translation.x = float(0.02)
         t.transform.translation.y = float(0.0)
         t.transform.translation.z = float(0.52)
-        t.transform.rotation.x = 0.0  # 0.659466
-        t.transform.rotation.y = 0.0  # -0.215248
-        t.transform.rotation.z = 0.0  # 0.719827
-        t.transform.rotation.w = 1.0  # 0.0249158
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = 1.0
 
         self.tf_static_broadcaster.sendTransform(t)
 
         # Create service
-        self.pick = self.create_service(Empty, 'pick', self.pick_callback,
-                                        callback_group=MutuallyExclusiveCallbackGroup())
+        self.pick = self.create_service(
+            Empty, 'pick', self.pick_callback,
+            callback_group=MutuallyExclusiveCallbackGroup()
+        )
+
         self.test = self.create_service(
-            Empty, 'test', self.test_callback, callback_group=MutuallyExclusiveCallbackGroup())
+            Empty, 'test', self.test_callback,
+            callback_group=MutuallyExclusiveCallbackGroup()
+        )
 
         self.timer = self.create_timer(1/100, self.timer_callback)
 
@@ -252,9 +251,6 @@ class PickNode(Node):
 
     async def test_callback(self, request, response):
         """Test."""
-        # transform_operations.detected obj pose -> goal pose.
-        # await self.MPI.move_arm_pose(goal_pose=self.pose)
-        # await self.MPI.move_arm_cartesian(waypoints=self.waypoints)
         club_face_tf = await self.MPI.get_transform('base', 'club_face')
         hole_tf = await self.MPI.get_transform('base', 'hole')
         ee_tf = await self.MPI.get_transform('base', 'fer_link8')
@@ -278,7 +274,7 @@ class PickNode(Node):
             pose.orientation = ee_pose.orientation
             waypoints.append(pose)
 
-        for i in range(4, -1):
+        for i in range(4, -1, -1):
             pose = Pose()
             pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
             pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
@@ -298,7 +294,7 @@ class PickNode(Node):
         return response
 
     async def goal_club_tf(self, ball_pose: Pose, hole_pose: Pose = None):
-        radius = 0.045
+        # radius = 0.045
         ball_pos = ball_pose.position
         hole_pos = hole_pose.position
         ball_hole_vec = np.array(
@@ -306,7 +302,7 @@ class PickNode(Node):
         theta_hole_ball = np.arctan2(ball_hole_vec[1], ball_hole_vec[0])
         ball_hole_mag = np.linalg.norm(ball_hole_vec)
         ball_hole_unit = ball_hole_vec / ball_hole_mag
-        club_face_position = -radius * ball_hole_unit
+        # Removed 'club_face_position' since it was unused
         club_face_orientation = quaternion_from_euler(
             0.0, 0.0, theta_hole_ball)
 
@@ -362,10 +358,10 @@ class PickNode(Node):
             t.transform.translation.x = float(0.2)
             t.transform.translation.y = float(0.4)
             t.transform.translation.z = float(0.015)
-            t.transform.rotation.x = 0.0  # 0.659466
-            t.transform.rotation.y = 0.0  # -0.215248
-            t.transform.rotation.z = 0.0  # 0.719827
-            t.transform.rotation.w = 1.0  # 0.0249158
+            t.transform.rotation.x = 0.0
+            t.transform.rotation.y = 0.0
+            t.transform.rotation.z = 0.0
+            t.transform.rotation.w = 1.0
 
             self.tf_static_broadcaster.sendTransform(t)
 
@@ -378,10 +374,10 @@ class PickNode(Node):
             t.transform.translation.x = float(0.3)
             t.transform.translation.y = float(0.0)
             t.transform.translation.z = float(0.021)
-            t.transform.rotation.x = 0.0  # 0.659466
-            t.transform.rotation.y = 0.0  # -0.215248
-            t.transform.rotation.z = 0.0  # 0.719827
-            t.transform.rotation.w = 1.0  # 0.0249158
+            t.transform.rotation.x = 0.0
+            t.transform.rotation.y = 0.0
+            t.transform.rotation.z = 0.0
+            t.transform.rotation.w = 1.0
 
             self.tf_static_broadcaster.sendTransform(t)
 
