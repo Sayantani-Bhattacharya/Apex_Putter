@@ -1,11 +1,13 @@
-import numpy as np
-from rclpy.node import Node
-from geometry_msgs.msg import Transform, TransformStamped
-from transforms3d.quaternions import quat2mat, mat2quat
-from transforms3d.affines import compose, decompose
-import apex_putter.RobotState as RS
-from geometry_msgs.msg import Pose
+"""Functions to convert between different types of transforms."""
+
 import math
+
+from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Transform, TransformStamped
+import numpy as np
+from transforms3d.affines import compose, decompose
+from transforms3d.quaternions import mat2quat, quat2mat
+
 
 def htm_to_transform(htm: np.array) -> Transform:
     """
@@ -33,14 +35,15 @@ def htm_to_transform(htm: np.array) -> Transform:
     return result
 
 def transform_to_htm(transform: Transform) -> np.array:
-    '''
-    Converts a Transform to a HTM object.
+    """
+    Convert a Transform object to a homogeneous transformation matrix.
 
     Args:
         transform: Transfrom is msg type of tf publisher.
     Returns:
-        htm format of the same (4x4 np.array): homogeneous transformation matrix 
-    '''
+        htm format of the same (4x4 np.array): \
+            homogeneous transformation matrix
+    """
     translation = np.array([
         transform.translation.x,
         transform.translation.y,
@@ -58,18 +61,20 @@ def transform_to_htm(transform: Transform) -> np.array:
     htm[0:3, 3] = translation
     return htm
 
-def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) -> Transform:
+
+def combine_transforms(known_matrix: np.array,
+                       tag_transform: TransformStamped) -> Transform:
     """
-    Combines a known transform matrix with a TF2 transform in ROS2
+    Combine a known transform matrix with a TF2 transform in ROS2.
 
     Args:
-        known_transform (4x4 np.array): A known homogeneous transformation matrix.
+        known_transform (4x4 np.array): A known homogeneous \
+            transformation matrix.
         tf2_transform (TransformStamped): Transform from TF2
 
     Returns:
         Transform: The resulting combined transform
     """
-
     # Convert TF2 transform to matrix
     tf2_translation = np.array([
         tag_transform.transform.translation.x,
@@ -93,31 +98,35 @@ def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) 
     return result
 
 def obj_in_bot_frame(T_camObj):
-    '''
-    For a fixed T_botCam value, used to transform frame 
-    from cam-obj to obj-bot.
+    """
+    Return the pose of the object in the robot frame.
+
     Args:
-        T_camObj (4x4 np.array): Camera-to-Ball transform 
+        T_camObj (4x4 np.array): Camera-to-Ball transform
+
     Returns:
-        Output(4x4 np.array): T_objBot
-      
-    '''
+        4x4 np.array: T_objBot
+
+    Fixed:
+        T_botCam
+    """
     # Write the fixed frame transform here.
     T_botCam = np.array([0])
     T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
 
 def detected_obj_pose(T_camObj: Transform):
-    '''
-    This function returns the pose in robot frame of the robot to 
+    """
+    Return the pose of the detected object in the robot frame.
+
+    This function returns the pose in robot frame of the robot to
     reach the object detected by vision.
 
-    Args: 
+    Args:
         transform: tf of object detected in camera frame
     Returns:
         pose: pose(or waypoint) of the object in robot frame.
-    '''
-
+    """
     T_camObj = transform_to_htm(T_camObj)
     T_objBot = obj_in_bot_frame(T_camObj)
     pose = Pose()
@@ -142,20 +151,20 @@ def compensate_ball_radius(dx,dy,dz, R=21):
         R: Radius of ball
     Returns:
         (x_r, y_r, z_r) : pose for center of the ball.
-    '''
+    """
     # R: Radius of ball
-    
+
     # Distance from the camera to the ball.
     distance = math.sqrt(dx**2 + dy**2 + dz**2)
-    
+
     # Scale the displacement to account for the radius of the ball.
     scaling_factor = (distance + R) / distance
-    
+
     # Coordinates of the ball center
     x_r = dx * scaling_factor
     y_r = dy * scaling_factor
     z_r = dz * scaling_factor
-    
+
     return x_r, y_r, z_r
 
 # Test functions
