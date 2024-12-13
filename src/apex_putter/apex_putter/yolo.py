@@ -20,6 +20,7 @@ Parameters
 """
 
 from apex_putter_interfaces.msg import Detection2D, DetectionArray
+
 import cv2
 from cv_bridge import CvBridge
 import rclpy
@@ -43,6 +44,7 @@ class YoloNode(Node):
         Array of all detection center coordinates
 
     Parameters
+    ----------
     model (string) - The Yolo model to use: see docs.ultralytics.org for \
         available values. Default is yolo11n.pt
     """
@@ -56,6 +58,7 @@ class YoloNode(Node):
                           get_parameter_value().string_value)
         self.create_subscription(Image, '/camera/camera/color/image_raw',
                                  self.yolo_callback, 10)
+
         self.image_pub = self.create_publisher(Image, 'image_yolo', 10)
         self.detections_pub = self.create_publisher(DetectionArray,
                                                     'ball_detections', 10)
@@ -67,19 +70,20 @@ class YoloNode(Node):
         # Run the model
         results = self.model(cv_image)
 
-        # Create detecgtion message
+        # Create detection message
         detections_msg = DetectionArray()
 
         # Process the results (draw bounding boxes on the image)
         for result in results:
             cv_image = result.plot()
 
-            # Check if any of the detected objects is a person
+            # Check detected objects
             for box in result.boxes:
                 x, y, w, h = box.xywh[0]  # center x, center y, width, height\
                 self.get_logger().debug(
                     f'Detected object at ({x}, {y}) with \
                         width {w} and height {h}')
+
                 center_x = int(x)
                 center_y = int(y)
 
@@ -96,7 +100,7 @@ class YoloNode(Node):
         self.detections_pub.publish(detections_msg)
 
         new_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
-        # publish
+        # Publish
         self.image_pub.publish(new_msg)
 
 

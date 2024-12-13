@@ -4,6 +4,7 @@ import math
 
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Transform, TransformStamped
+
 import numpy as np
 from transforms3d.affines import compose, decompose
 from transforms3d.quaternions import mat2quat, quat2mat
@@ -18,19 +19,17 @@ def htm_to_transform(htm: np.array) -> Transform:
     Returns:
         transform: Transfrom is msg type of tf publisher.
     """
-    # Decompose the result
     translation, rotation, _, _ = decompose(htm)
-    quaternion = mat2quat(rotation)  # Returns w,x,y,z
+    quaternion = mat2quat(rotation)  # returns w,x,y,z
 
-    # Create and populate result transform
     result = Transform()
     result.translation.x = float(translation[0])
     result.translation.y = float(translation[1])
     result.translation.z = float(translation[2])
-    result.rotation.w = float(quaternion[0])  # transforms3d returns w,x,y,z
-    result.rotation.x = float(quaternion[1])
-    result.rotation.y = float(quaternion[2])
-    result.rotation.z = float(quaternion[3])
+    result.rotation.w = float(quaternion[0])  # w
+    result.rotation.x = float(quaternion[1])  # x
+    result.rotation.y = float(quaternion[2])  # y
+    result.rotation.z = float(quaternion[3])  # z
 
     return result
 
@@ -67,7 +66,7 @@ def combine_transforms(known_matrix: np.array,
                        tag_transform: TransformStamped) -> Transform:
     """
     Combine a known transform matrix with a TF2 transform in ROS2.
-
+    
     Args:
         known_transform (4x4 np.array): A known homogeneous \
             transformation matrix.
@@ -75,6 +74,7 @@ def combine_transforms(known_matrix: np.array,
 
     Returns:
         Transform: The resulting combined transform
+        
     """
     # Convert TF2 transform to matrix
     tf2_translation = np.array([
@@ -82,22 +82,20 @@ def combine_transforms(known_matrix: np.array,
         tag_transform.transform.translation.y,
         tag_transform.transform.translation.z
     ])
-    tf2_rotation = quat2mat([
+    tf2_quaternion = [
         tag_transform.transform.rotation.w,
         tag_transform.transform.rotation.x,
         tag_transform.transform.rotation.y,
         tag_transform.transform.rotation.z
-    ])
+    ]
+    tf2_rotation = quat2mat(tf2_quaternion)
     tf2_scale = np.ones(3)
     tf2_matrix = compose(tf2_translation, tf2_rotation, tf2_scale)
 
     # Combine transforms through matrix multiplication
     result_matrix = np.matmul(tf2_matrix, known_matrix)
-
     result = htm_to_transform(result_matrix)
-
     return result
-
 
 def obj_in_bot_frame(T_camObj):
     """
@@ -132,17 +130,13 @@ def detected_obj_pose(T_camObj: Transform):
     """
     T_camObj = transform_to_htm(T_camObj)
     T_objBot = obj_in_bot_frame(T_camObj)
+
     pose = Pose()
     pose.position.x = T_objBot[0, 3]
     pose.position.y = T_objBot[1, 3]
     pose.position.z = T_objBot[2, 3]
-    # Figure a way to calc optimal orientation
-    # pose.orientation.x = 0.90305
-    # pose.orientation.y = 0.429622
-    # pose.orientation.z = -3.8634e-05
-    # pose.orientation.w = -5.0747e-06
+    # Orientation calculation not implemented yet.
     return pose
-
 
 def compensate_ball_radius(dx, dy, dz, R=21):
     """
@@ -171,13 +165,11 @@ def compensate_ball_radius(dx, dy, dz, R=21):
 
     return x_r, y_r, z_r
 
-# Test functions
-
 
 def test():
-    '''
+    """
     To test the above helper functions.
-    '''
+    """
     manipulator_pos = np.array([
         [0.7071, -0.7071, 0, 1],
         [0.7071, 0.7071, 0, 0.44454056],
@@ -189,4 +181,5 @@ def test():
     print(htm)
 
 
-test()
+if __name__ == '__main__':
+    test()
