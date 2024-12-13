@@ -161,7 +161,6 @@ class MotionPlanner():
             the planned trajectory
 
         """
-
         # define goal joint constriants
         joint_constraints = []
         for i in range(len(joint_name)):
@@ -288,7 +287,6 @@ class MotionPlanner():
                 otherwise planned trajectory.
 
         """
-
         # define goal constraints
         position_constraints = []
         orientation_constraints = []
@@ -414,7 +412,6 @@ class MotionPlanner():
                 otherwise 'planned_trajectory'.
 
         """
-
         self.node.get_logger().info(f'Waypoint: {waypoints}')
 
         # Create the request for the GetCartesianPath service
