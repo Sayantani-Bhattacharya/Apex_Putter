@@ -134,9 +134,7 @@ class DemoNode(Node):
         )
 
     def update_real_world_positions(self):
-        """
-        To update the ball positions, using lookup transforms.
-        """
+        """Update the ball positions, using lookup transforms."""
         try:
             # Using matrix approach:
             base_cam_tf = self.tf_buffer.lookup_transform(
@@ -178,8 +176,11 @@ class DemoNode(Node):
     def compute_waypoints(self):
         """
         Calculate the waypoints for the trajectory.
-        Returns:
+
+        Returns
+        -------
             waypoint: array of Pose()
+
         """
         direction = self.hole_position - self.ball_position
         distance = np.linalg.norm(direction)
@@ -215,8 +216,11 @@ class DemoNode(Node):
     def default_waypoints(self):
         """
         Hard coded waypoints for testing.
-        Returns:
+
+        Returns
+        -------
             waypoint: array of Pose()
+
         """
         w1 = Pose()
         w1.position.x = 0.45
@@ -239,8 +243,8 @@ class DemoNode(Node):
         return [w1, w2, w3]
 
     def setup_ball_marker(self):
-        """Setup ball marker."""
-        self.ball_marker.ns = "ball_marker_ns"
+        """Ball marker setup."""
+        self.ball_marker.ns = 'ball_marker_ns'
         self.ball_marker.id = 0
         self.ball_marker.header.frame_id = self.base_frame
         self.ball_marker.type = Marker.SPHERE
@@ -258,9 +262,8 @@ class DemoNode(Node):
         self.ball_marker.pose.position.z = float(self.ball_position[2])
 
     def setup_hole_marker(self):
-
-        """Setup hole marker."""
-        self.hole_marker.ns = "hole_marker_ns"
+        """Hole marker setup."""
+        self.hole_marker.ns = 'hole_marker_ns'
         self.hole_marker.id = 0
         self.hole_marker.header.frame_id = self.base_frame
         self.hole_marker.type = Marker.CYLINDER
@@ -278,9 +281,7 @@ class DemoNode(Node):
         self.hole_marker.pose.position.z = float(self.hole_position[2])
 
     def publish_markers(self):
-        """
-        Publish hole and ball markers.
-        """
+        """Publish hole and ball markers."""
         now = self.get_clock().now().to_msg()
         self.ball_marker.header.stamp = now
         self.hole_marker.header.stamp = now
@@ -288,9 +289,7 @@ class DemoNode(Node):
         self.hole_marker_pub.publish(self.hole_marker)
 
     async def sim_callback(self, request, response):
-        """
-        Service call for motion sequence.
-        """
+        """Service call for motion sequence."""
         if not self.use_simulation_mode:
             self.get_logger().warn(
                 'simulate service called, but simulation_mode is False.'
@@ -304,9 +303,7 @@ class DemoNode(Node):
         return response
 
     async def real_putt_callback(self, request, response):
-        """
-            Service call for putting sequence.
-        """
+        """Service call for putting sequence."""
         if self.use_simulation_mode:
             self.get_logger().info(
                 'Real putt requested, but simulation_mode is True. '
@@ -330,7 +327,7 @@ class DemoNode(Node):
 
     async def run_motion_sequence(self):
         """To simulate the motion sequence."""
-        self.get_logger().info("Planning and executing Cartesian path...")
+        self.get_logger().info('Planning and executing Cartesian path...')
         result = await self.MPI.move_arm_cartesian(
             waypoints=self.waypoints,
             avoid_collisions=False
@@ -347,21 +344,20 @@ class DemoNode(Node):
         return False
 
     def calculate_ball_trajectory(self):
-        '''
-        Calculates the direction and distance 
-        to the hole from the ball.
+        """
+        Calculate the direction and distance to the hole from the ball.
 
-        Returns:
+        Returns
+        -------
             unit_direction: unit vector of vector of ball to hole.
             distance: distance between ball to hole.
-        '''
+
+        """
         unit_direction, distance = self.trajectory_calculator.calculate_trajectory()
         return unit_direction, distance
 
     def animate_ball_movement(self, unit_direction, distance):
-        """
-        Physics for the ball movement in simulation.
-        """
+        """Physics for the ball movement in simulation."""
         mu = 0.26
         g = 9.81
         a = -mu * g
@@ -383,16 +379,15 @@ class DemoNode(Node):
         )
 
     def ball_timer_callback(self):
-        '''
-        To increment the amination time of ball.
-        '''
+        """Increment the amination time of ball."""
         t = self.ball_animation_time
         if t > self.ball_animation_end_time:
             self.destroy_timer(self.ball_animation_timer)
             self.ball_animation_timer = None
             return
 
-        s = self.ball_initial_velocity * t + 0.5 * self.ball_acceleration * (t ** 2)
+        s = self.ball_initial_velocity * t + \
+            0.5 * self.ball_acceleration * (t ** 2)
         if s < 0:
             self.destroy_timer(self.ball_animation_timer)
             self.ball_animation_timer = None

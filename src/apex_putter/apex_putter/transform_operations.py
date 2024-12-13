@@ -12,12 +12,16 @@ from transforms3d.quaternions import mat2quat, quat2mat
 
 def htm_to_transform(htm: np.array) -> Transform:
     """
-    Converts a HTM to a Transform object.
+    Convert a HTM to a Transform object.
 
-    Args:
+    Args
+    ----
         htm format of the same (4x4 np.array): homogeneous transformation matrix.
-    Returns:
+
+    Returns
+    -------
         transform: Transfrom is msg type of tf publisher.
+
     """
     translation, rotation, _, _ = decompose(htm)
     quaternion = mat2quat(rotation)  # returns w,x,y,z
@@ -38,11 +42,15 @@ def transform_to_htm(transform: Transform) -> np.array:
     """
     Convert a Transform object to a homogeneous transformation matrix.
 
-    Args:
+    Args
+    ----
         transform: Transfrom is msg type of tf publisher.
-    Returns:
+
+    Returns
+    -------
         htm format of the same (4x4 np.array): \
             homogeneous transformation matrix
+
     """
     translation = np.array([
         transform.translation.x,
@@ -66,15 +74,17 @@ def combine_transforms(known_matrix: np.array,
                        tag_transform: TransformStamped) -> Transform:
     """
     Combine a known transform matrix with a TF2 transform in ROS2.
-    
-    Args:
+
+    Args
+    ----
         known_transform (4x4 np.array): A known homogeneous \
             transformation matrix.
         tf2_transform (TransformStamped): Transform from TF2
 
-    Returns:
+    Returns
+    -------
         Transform: The resulting combined transform
-        
+
     """
     # Convert TF2 transform to matrix
     tf2_translation = np.array([
@@ -97,18 +107,23 @@ def combine_transforms(known_matrix: np.array,
     result = htm_to_transform(result_matrix)
     return result
 
+
 def obj_in_bot_frame(T_camObj):
     """
     Return the pose of the object in the robot frame.
 
-    Args:
+    Args
+    ----
         T_camObj (4x4 np.array): Camera-to-Ball transform
 
-    Returns:
+    Returns
+    -------
         4x4 np.array: T_objBot
 
-    Fixed:
+    Fixed
+    -----
         T_botCam
+
     """
     # Write the fixed frame transform here.
     T_botCam = np.array([0])
@@ -123,10 +138,14 @@ def detected_obj_pose(T_camObj: Transform):
     This function returns the pose in robot frame of the robot to
     reach the object detected by vision.
 
-    Args:
+    Args
+    ----
         transform: tf of object detected in camera frame
-    Returns:
+
+    Returns
+    -------
         pose: pose(or waypoint) of the object in robot frame.
+
     """
     T_camObj = transform_to_htm(T_camObj)
     T_objBot = obj_in_bot_frame(T_camObj)
@@ -138,17 +157,21 @@ def detected_obj_pose(T_camObj: Transform):
     # Orientation calculation not implemented yet.
     return pose
 
+
 def compensate_ball_radius(dx, dy, dz, R=21):
     """
-    Helper function to translate the pose from ball suface to ball's center,
-    considering it a sphere.
+    Translate the pose from ball suface to ball's center.
 
-    Args:
+    Args
+    ----
         (x_c, y_c, z_c) : camera pose
         (x_b, y_b, z_b) : ball pose
         R: Radius of ball
-    Returns:
+
+    Returns
+    -------
         (x_r, y_r, z_r) : pose for center of the ball.
+
     """
     # R: Radius of ball
 
@@ -167,9 +190,7 @@ def compensate_ball_radius(dx, dy, dz, R=21):
 
 
 def test():
-    """
-    To test the above helper functions.
-    """
+    """To test the above helper functions."""
     manipulator_pos = np.array([
         [0.7071, -0.7071, 0, 1],
         [0.7071, 0.7071, 0, 0.44454056],

@@ -17,6 +17,8 @@ Parameters
 ----------
     + model (string) - The Yolo model to use: see docs.ultralytics.org for \
         available values. Default is best.pt.
+
+
 """
 
 from apex_putter_interfaces.msg import Detection2D, DetectionArray
@@ -47,6 +49,8 @@ class YoloNode(Node):
     ----------
     model (string) - The Yolo model to use: see docs.ultralytics.org for \
         available values. Default is yolo11n.pt
+
+
     """
 
     def __init__(self):

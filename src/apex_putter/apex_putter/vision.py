@@ -22,9 +22,6 @@ Publishers
 /ball_marker : visualization_msgs.msg.Marker
     Publishes markers for detected balls in RViz.
 
-Parameters
-----------
-None
 """
 
 import apex_putter.transform_operations as transOps
@@ -36,8 +33,6 @@ import numpy as np
 import pyrealsense2 as rs
 import rclpy
 from rclpy.node import Node
-
-from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 
 from sensor_msgs.msg import CameraInfo, Image
 import tf2_ros
@@ -97,7 +92,7 @@ class Vision(Node):
         self.atag_to_rbf_transform.rotation.w = 0.5158735921722442
 
         # TF listener
-        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_buffer = tf2_ros.buffer.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self.rbf_publisher = self.create_publisher(
@@ -148,10 +143,10 @@ class Vision(Node):
         except ValueError as e:
             self.get_logger().error(
                 'ValueError in imageDepthCallback: {}'.format(e))
-            
+
             return
 
-    def image_depth_info_callback(self, camera_info):
+    def image_depth_info_callback(self, cameraInfo):
         """Obtain depth camera information."""
         try:
             if self.intrinsics:
@@ -180,16 +175,7 @@ class Vision(Node):
             return
 
     def imageColorCallback(self, data):
-        """
-        Call for the latest color image.
-
-        Args:
-        ----
-            data (Image): Color image message.
-        """
-
-    def image_color_callback(self, data):
-        """Obtain the latest color image."""
+        """Call for the latest color image."""
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, 'bgr8')
             self._latest_color_img = cv_image

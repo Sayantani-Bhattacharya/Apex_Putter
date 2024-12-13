@@ -8,12 +8,13 @@ class BallTrajectoryCalculator:
 
     def calculate_trajectory(self):
         """
-        Calculates the direction and distance 
-        to the hole from the ball.
+        Calculate the direction and distance to the hole from the ball.
 
-        Returns:
+        Returns
+        -------
             unit_direction: unit vector of vector of ball to hole.
             distance: distance between ball to hole.
+
         """
         direction = self.hole_position - self.ball_position
         distance = np.linalg.norm(direction)
