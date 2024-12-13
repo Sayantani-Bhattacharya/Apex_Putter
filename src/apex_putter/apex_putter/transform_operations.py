@@ -34,6 +34,7 @@ def htm_to_transform(htm: np.array) -> Transform:
 
     return result
 
+
 def transform_to_htm(transform: Transform) -> np.array:
     """
     Convert a Transform object to a homogeneous transformation matrix.
@@ -97,6 +98,7 @@ def combine_transforms(known_matrix: np.array,
 
     return result
 
+
 def obj_in_bot_frame(T_camObj):
     """
     Return the pose of the object in the robot frame.
@@ -114,6 +116,7 @@ def obj_in_bot_frame(T_camObj):
     T_botCam = np.array([0])
     T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
+
 
 def detected_obj_pose(T_camObj: Transform):
     """
@@ -140,8 +143,9 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-def compensate_ball_radius(dx,dy,dz, R=21):
-    '''
+
+def compensate_ball_radius(dx, dy, dz, R=21):
+    """
     Helper function to translate the pose from ball suface to ball's center,
     considering it a sphere.
 
@@ -168,6 +172,8 @@ def compensate_ball_radius(dx,dy,dz, R=21):
     return x_r, y_r, z_r
 
 # Test functions
+
+
 def test():
     '''
     To test the above helper functions.
@@ -181,5 +187,6 @@ def test():
     tranform = htm_to_transform(manipulator_pos)
     htm = transform_to_htm(tranform)
     print(htm)
+
 
 test()
