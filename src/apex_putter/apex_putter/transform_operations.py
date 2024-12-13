@@ -10,7 +10,14 @@ from transforms3d.quaternions import mat2quat, quat2mat
 
 
 def htm_to_transform(htm: np.array) -> Transform:
-    """Convert a HTM to a Transform object."""
+    """
+    Converts a HTM to a Transform object.
+
+    Args:
+        htm format of the same (4x4 np.array): homogeneous transformation matrix.
+    Returns:
+        transform: Transfrom is msg type of tf publisher.
+    """
     # Decompose the result
     translation, rotation, _, _ = decompose(htm)
     quaternion = mat2quat(rotation)  # Returns w,x,y,z
@@ -26,7 +33,6 @@ def htm_to_transform(htm: np.array) -> Transform:
     result.rotation.z = float(quaternion[3])
 
     return result
-
 
 def transform_to_htm(transform: Transform) -> np.array:
     """
@@ -91,7 +97,6 @@ def combine_transforms(known_matrix: np.array,
 
     return result
 
-
 def obj_in_bot_frame(T_camObj):
     """
     Return the pose of the object in the robot frame.
@@ -109,7 +114,6 @@ def obj_in_bot_frame(T_camObj):
     T_botCam = np.array([0])
     T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
-
 
 def detected_obj_pose(T_camObj: Transform):
     """
@@ -136,12 +140,12 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
+def compensate_ball_radius(dx,dy,dz, R=21):
+    '''
+    Helper function to translate the pose from ball suface to ball's center,
+    considering it a sphere.
 
-def compensate_ball_radius(dx, dy, dz, R=21):
-    """
-    Compensates for the radius of the ball.
-
-    Input:
+    Args:
         (x_c, y_c, z_c) : camera pose
         (x_b, y_b, z_b) : ball pose
         R: Radius of ball
@@ -164,19 +168,18 @@ def compensate_ball_radius(dx, dy, dz, R=21):
     return x_r, y_r, z_r
 
 # Test functions
-
-
 def test():
+    '''
+    To test the above helper functions.
+    '''
     manipulator_pos = np.array([
         [0.7071, -0.7071, 0, 1],
         [0.7071, 0.7071, 0, 0.44454056],
         [0, 0, 1, 0.66401457],
         [0, 0, 0, 1]
     ])
-
     tranform = htm_to_transform(manipulator_pos)
     htm = transform_to_htm(tranform)
     print(htm)
-
 
 test()
