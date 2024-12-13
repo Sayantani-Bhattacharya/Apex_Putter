@@ -8,8 +8,6 @@ from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
-from time import sleep
-
 from tf_transformations import quaternion_from_euler
 
 
@@ -64,13 +62,12 @@ class DemoNode(Node):
         self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.swing_srv = self.create_service(Empty, 'swing', self.swing_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
-        # Timer for optional tasks
-        # self.timer = self.create_timer(0.1, self.timer_callback)
-
         self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
 
-    async def home_callback(self, request, response):
-        """Make the robot go to home pose"""
+    async def home_callback(self, request, response):        
+        """
+        Service to move frank to the defined home position.
+        """
         self.get_logger().info("Home requested.")
         await self.MPI.move_arm_joints(joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         self.v_h2b = self.calculate_hole_to_ball_vector()
@@ -79,7 +76,9 @@ class DemoNode(Node):
         return response
 
     def look_up_ball_in_base_frame(self):
-        """Look up the ball position in the base frame"""
+        """
+        Look up to get the transform of ball position in the base frame.
+        """
         self.get_logger().info("Looking up ball position in base frame.")
         try:
             transform_base_ball = self.tf_buffer.lookup_transform(
@@ -94,7 +93,9 @@ class DemoNode(Node):
             self.get_logger().error(f"Failed to look up ball position: {e}")
 
     def look_up_hole_in_base_frame(self):
-        """Look up the hole position in the base frame"""
+        """
+        Look up get the transform of the hole position in the base frame.
+        """
         self.get_logger().info("Looking up hole position in base frame.")
         try:
             transform_base_hole = self.tf_buffer.lookup_transform(
@@ -109,14 +110,23 @@ class DemoNode(Node):
             self.get_logger().error(f"Failed to look up hole position: {e}")
 
     def calculate_hole_to_ball_vector(self):
-        """Calculate the vector from the hole to the ball"""
+        """
+        Calculates the vector from the hole to the ball,
+        using the ball and hole transforms.
+        Returns:
+            array of 3 elements (x,y,z): vector of hole to ball.
+        """
         self.look_up_ball_in_base_frame()
         self.look_up_hole_in_base_frame()
-        # flatten the hole position on z-axis
+        # flatten the hole position on z-axis.
         self.hole_position[2] = self.ball_position[2]
-        return self.ball_position - self.hole_position  # vector: hole to ball
+        return self.ball_position - self.hole_position  
 
     def goal_club_tf(self):
+        '''
+        Function to calculate and publish a static broadcaster of 
+        the desired transform of the clubface in robot frame.
+        '''
         radius = 0.045
         ball_hole_vec = -self.calculate_hole_to_ball_vector()
         theta_hole_ball = np.arctan2(ball_hole_vec[1], ball_hole_vec[0])
@@ -142,6 +152,11 @@ class DemoNode(Node):
         self.tf_static_broadcaster.sendTransform(t)
 
     def goal_ee_tf(self):
+        '''
+        Function to calculate and publish a static broadcaster of 
+        the transform of the franka's end effector link 
+        (before gripper) with clubface as the parent link.
+        '''
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'goal_face'
@@ -160,7 +175,10 @@ class DemoNode(Node):
         self.tf_static_broadcaster.sendTransform(t)
 
     async def ready_callback(self, request, response):
-        """Prepare the robot for putting"""
+        """
+        Service call to move the robot to the putting position.
+        """
+        
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
@@ -179,6 +197,10 @@ class DemoNode(Node):
         return response
 
     def calculate_putt_strength(self):
+        '''
+        Calculates the max_velocity_scaling_factor for putting. (Approximation)   
+        Used for ease of tuning the velocity and acceleration scaling factors.     
+        '''
         scaling_factor = 1.0
         distance = np.linalg.norm(self.v_h2b)
         output = scaling_factor * distance
@@ -188,7 +210,9 @@ class DemoNode(Node):
 
 
     async def putt_callback(self, request, response):
-        """Putt the fucking ball"""
+        """
+        Service call to plan and execute the putting trajectory for the robot.
+        """
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
         ideal_ee_transform = self.tf_buffer.lookup_transform(self.base_frame, 'goal_ee', rclpy.time.Time())
@@ -203,6 +227,17 @@ class DemoNode(Node):
         traj_unit = traj_vec / traj_mag 
 
         def contruct_putt_pose(vector, ideal_pose, scaling):
+            """
+            Calculate the putt poses, discretised in the trajectory.
+
+            Args:
+                vector: unit vector of hole to ball.
+                ideal_pose: the final desired pose.
+                scaling: the increment factor.
+
+            Returns:
+                pose (type: Pose()): the putting pose.
+            """
             pose = Pose()
             pose.position.x = ideal_pose.position.x - scaling * vector[0]
             pose.position.y = ideal_pose.position.y - scaling * vector[1]
@@ -210,7 +245,7 @@ class DemoNode(Node):
             pose.orientation = ideal_pose.orientation
             return pose
         
-        # Test to get waypoints for cartesian paths
+        # Test to get waypoints for cartesian paths.
         start_scale = -0.15 # Negative Scale first / could probably start at 0
         end_scale = 0.11
 
@@ -224,30 +259,14 @@ class DemoNode(Node):
 
         self.get_logger().info(f"Waypoints Planned:{waypoints}")
         self.get_logger().info("Attempting to Putt in Cartesian Path")
-
-        # putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
-
-        putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
-
-        # self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
-        self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
-
-        self.get_logger().info("Moving arm to putt.")
-
-        # await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
-
-        # self.get_logger().info("Putt the ball.")
-        # sleep(0.8)
-        # await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.4)
         strength = self.calculate_putt_strength()
-
-        self.get_logger().info(f"=====================Putt strength: {strength}=====================")    
-
         await self.MPI.move_arm_cartesian(waypoints, max_velocity_scaling_factor=strength, max_acceleration_scaling_factor=strength * 0.8)
         return response
     
     async def swing_callback(self, request, response):
-        """Swing 'em!!"""
+        """
+        Service call to plan and execute the swinging trajectory for the robot.
+        """
         self.get_logger().info("Swing requested.")
         self.get_logger().info("=============================================================")
 
@@ -263,7 +282,9 @@ class DemoNode(Node):
         return response
 
     def offset_ball_position(self, z):
-        """Offset the ball position by z"""
+        """
+            Offset the ball position by z.
+        """
         self.ball_position[2] += z
 
 
