@@ -65,43 +65,19 @@ class DemoNode(Node):
         self.tf_static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
         # Services
-        self.ready_srv = self.create_service(
-            Empty,
-            'ready',
-            self.ready_callback,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
-        self.home_srv = self.create_service(
-            Empty,
-            'home_robot',
-            self.home_callback,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
-        self.putt_srv = self.create_service(
-            Empty,
-            'putt',
-            self.putt_callback,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
-        self.swing_srv = self.create_service(
-            Empty,
-            'swing',
-            self.swing_callback,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
+        self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.swing_srv = self.create_service(Empty, 'swing', self.swing_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
-        self.get_logger().info(
-            'DemoNode initialized. Use "/simulate" or "/real_putt".'
-        )
+        self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
 
-    async def home_callback(self, request, response):
-        """Make the robot go to home pose."""
-        self.get_logger().info('Home requested.')
-        await self.MPI.move_arm_joints(
-            joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0],
-            max_velocity_scaling_factor=0.2,
-            max_acceleration_scaling_factor=0.2
-        )
+    async def home_callback(self, request, response):        
+        """
+        Service to move frank to the defined home position.
+        """
+        self.get_logger().info("Home requested.")
+        await self.MPI.move_arm_joints(joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         self.v_h2b = self.calculate_hole_to_ball_vector()
         self.goal_club_tf()
         self.goal_ee_tf()
@@ -151,7 +127,7 @@ class DemoNode(Node):
         self.look_up_hole_in_base_frame()
         # Flatten the hole position on z-axis
         self.hole_position[2] = self.ball_position[2]
-        return self.ball_position - self.hole_position  # vector: hole to ball
+        return self.ball_position - self.hole_position  
 
     def goal_club_tf(self):
         """Broadcast a transform for the goal club face position."""
@@ -264,6 +240,7 @@ class DemoNode(Node):
         traj_mag = np.linalg.norm(traj_vec)
         traj_unit = traj_vec / traj_mag
 
+
         def construct_putt_pose(vector, base_pose, scaling):
             pose = Pose()
             pose.position.x = base_pose.position.x - scaling * vector[0]
@@ -281,6 +258,7 @@ class DemoNode(Node):
         for s in scaling_waypoints:
             w_pose = construct_putt_pose(traj_unit, ideal_pose, s)
             waypoints.append(w_pose)
+
 
         self.get_logger().info(f'Waypoints Planned:{waypoints}')
         self.get_logger().info('Attempting to Putt in Cartesian Path')
@@ -322,7 +300,9 @@ class DemoNode(Node):
         return response
 
     def offset_ball_position(self, z):
+
         """Offset the ball position by z."""
+
         self.ball_position[2] += z
 
 

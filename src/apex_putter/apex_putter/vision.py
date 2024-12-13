@@ -1,14 +1,34 @@
 """
 Vision module for Apex Putter.
 
-This node is responsible for detecting the golf ball and publishing transformations
-for the robot base.
-Author: Zhengyang Kris Weng
+This nodes is responsible for detecting the golf ball and publishes \
+    transformation for robot base.
+
+Subscribers
+-----------
+/camera/camera/aligned_depth_to_color/image_raw : sensor_msgs.msg.Image
+    Subscribes to the depth image from the camera.
+/camera/camera/color/camera_info : sensor_msgs.msg.CameraInfo
+    Subscribes to the camera info for depth image processing.
+/camera/camera/color/image_raw : sensor_msgs.msg.Image
+    Subscribes to the color image from the camera.
+/ball_detections : apex_putter_interfaces.msg.DetectionArray
+    Subscribes to the ball detection messages.
+
+Publishers
+----------
+/robot_base_frame : geometry_msgs.msg.TransformStamped
+    Publishes the transform of the robot base frame.
+/ball_marker : visualization_msgs.msg.Marker
+    Publishes markers for detected balls in RViz.
+
+Parameters
+----------
+None
 """
 
-from apex_putter.transform_operations import compensate_ball_radius, htm_to_transform
+import apex_putter.transform_operations as transOps
 from apex_putter_interfaces.msg import DetectionArray
-
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import TransformStamped
 
@@ -16,6 +36,8 @@ import numpy as np
 import pyrealsense2 as rs
 import rclpy
 from rclpy.node import Node
+
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 
 from sensor_msgs.msg import CameraInfo, Image
 import tf2_ros
@@ -31,7 +53,9 @@ class Vision(Node):
         # RS parameters
         self.intrinsics = None
         self._depth_info_topic = '/camera/camera/color/camera_info'
-        self._depth_image_topic = '/camera/camera/aligned_depth_to_color/image_raw'
+
+        self._depth_image_topic = \
+            '/camera/camera/aligned_depth_to_color/image_raw'
         self._colored_image_topic = '/camera/camera/color/image_raw'
 
         self._latest_color_img = None
@@ -58,9 +82,12 @@ class Vision(Node):
 
         self.ball_radius = 21  # mm
 
-        self.atag_to_rbf_transform = htm_to_transform(self.atag_to_rbf_matrix)
+        self.atag_to_rbf_transform = \
+            transOps.htm_to_transform(self.atag_to_rbf_matrix)
 
         # Calibrated transform
+        # GOLDEN
+        # self.atag_to_rbf_transform = Transform()
         self.atag_to_rbf_transform.translation.x = 0.180
         self.atag_to_rbf_transform.translation.y = -0.120
         self.atag_to_rbf_transform.translation.z = -0.075
@@ -92,9 +119,11 @@ class Vision(Node):
             10
         )
 
-        self.balls_detected_array = None  # 2D pixel location
-        self.balls_in_camera_frame = None  # 3D camera frame location
-        self.compensated_balls_in_camera_frame = None  # Compensated 3D camera frame location
+        self.balls_detected_array = None  # 2d pixel location
+        self.balls_in_camera_frame = None  # 3d camera frame location
+
+        # 3d camera frame \location compensated
+        self.compensated_balls_in_camera_frame = None
 
         self.timer = self.create_timer(0.001, self.timer_callback)
 
@@ -113,9 +142,13 @@ class Vision(Node):
             cv_image = self.bridge.imgmsg_to_cv2(data, data.encoding)
             self._latest_depth_img = cv_image
         except CvBridgeError as e:
-            self.get_logger().error('CvBridgeError in image_depth_callback: {}'.format(e))
+            self.get_logger().error(
+                'CvBridgeError in imageDepthCallback: {}'.format(e))
+
         except ValueError as e:
-            self.get_logger().error('ValueError in image_depth_callback: {}'.format(e))
+            self.get_logger().error(
+                'ValueError in imageDepthCallback: {}'.format(e))
+            
             return
 
     def image_depth_info_callback(self, camera_info):
@@ -124,26 +157,36 @@ class Vision(Node):
             if self.intrinsics:
                 return
             self.intrinsics = rs.intrinsics()
-            self.intrinsics.width = camera_info.width
-            self.intrinsics.height = camera_info.height
-            self.intrinsics.ppx = camera_info.k[2]
-            self.intrinsics.ppy = camera_info.k[5]
-            self.intrinsics.fx = camera_info.k[0]
-            self.intrinsics.fy = camera_info.k[4]
-            if camera_info.distortion_model == 'plumb_bob':
+
+            self.intrinsics.width = cameraInfo.width
+            self.intrinsics.height = cameraInfo.height
+            self.intrinsics.ppx = cameraInfo.k[2]
+            self.intrinsics.ppy = cameraInfo.k[5]
+            self.intrinsics.fx = cameraInfo.k[0]
+            self.intrinsics.fy = cameraInfo.k[4]
+            if cameraInfo.distortion_model == 'plumb_bob':
                 self.intrinsics.model = rs.distortion.brown_conrady
-            elif camera_info.distortion_model == 'equidistant':
+            elif cameraInfo.distortion_model == 'equidistant':
                 self.intrinsics.model = rs.distortion.kannala_brandt4
-            self.intrinsics.coeffs = list(camera_info.d)  # replaced unnecessary list comp
+            self.intrinsics.coeffs = list(cameraInfo.d)
+
+            # DEBUG
             self.scale_factor = self.intrinsics.width / 450
             self.get_logger().info(
-                'intrinsics_width: {}, depth_y: {}'.format(
-                    self.intrinsics.width, self.intrinsics.height
-                )
-            )
+                f'intrinsics_width: {self.intrinsics.width}, \
+                    depth_y: {self.intrinsics.height}')
         except CvBridgeError as e:
             self.get_logger().error('CvBridgeError in image_depth_info_callback: {}'.format(e))
             return
+
+    def imageColorCallback(self, data):
+        """
+        Call for the latest color image.
+
+        Args:
+        ----
+            data (Image): Color image message.
+        """
 
     def image_color_callback(self, data):
         """Obtain the latest color image."""
@@ -176,7 +219,19 @@ class Vision(Node):
         self.static_broadcaster.sendTransform(rbf_to_base_transform)
 
     def deproject_depth_point(self, x, y):
-        """Convert pixel coordinates to real-world coordinates using depth information."""
+        """
+        Convert pixel coordinates to real-world coordinates using depth info.
+
+        Args:
+        ----
+            x (int): X-coordinate.
+            y (int): Y-coordinate.
+
+        Returns
+        -------
+            Tuple[float, float, float]: Real-world coordinates (x, y, z).
+
+        """
         if (
             self.intrinsics and
             self._latest_depth_img is not None and
@@ -184,20 +239,31 @@ class Vision(Node):
         ):
             depth_x = int(x)
             depth_y = int(y)
+            # self.get_logger().info(f"depth_x: {depth_x}, depth_y: {depth_y}")
+            # depth = self._latest_depth_img[depth_x, depth_y]
             depth = self._latest_depth_img[depth_y, depth_x]
-            result = rs.rs2_deproject_pixel_to_point(self.intrinsics, [x, y], depth)
+            result = rs.rs2_deproject_pixel_to_point(
+                self.intrinsics, [x, y], depth)
+
             x_new, y_new, z_new = result[0], result[1], result[2]
             return x_new, y_new, z_new
 
     def ball_detection_callback(self, msg):
-        """Create callback for ball detection."""
+        """Handle ball detection callback."""
+        # Initialize empty array with 2 columns for x,y coordinates
         balls_detected = np.empty((0, 2))
-        for detection in msg.detections:
-            self.get_logger().debug('Detected ball at ({}, {})'.format(detection.x, detection.y))
+
+        for detection in msg.detections:  # Note: using msg.points
+            self.get_logger().debug(
+                f'Detected ball at ({detection.x}, {detection.y})')
+            # Create a 1x2 array for the current detection
+
             ball_detected = np.array([[detection.x, detection.y]])
             balls_detected = np.vstack((balls_detected, ball_detected))
 
         self.balls_detected_array = balls_detected
+        # self.get_logger().info(
+        #     f"Ball detected at {self.balls_detected_array}")
 
         # Deproject into 3D
         balls_camera_frame = np.empty((0, 3))
@@ -207,13 +273,14 @@ class Vision(Node):
                 i_x = i[0]
                 i_y = i[1]
                 x, y, z = self.deproject_depth_point(i_x, i_y)
-                comp_x, comp_y, comp_z = compensate_ball_radius(dx=x,
-                                                                dy=y,
-                                                                dz=z,
-                                                                R=self.ball_radius)
-                i_array = np.array([x, y, z]) / 1000.0
+                # deprojected to ball centre.
+                comp_x, comp_y, comp_z = transOps.compensate_ball_radius(
+                    dx=x, dy=y, dz=z, R=self.ball_radius)
+                i_array = np.array([x, y, z])
+                i_array = i_array/1000  # Convert to meters
                 balls_camera_frame = np.vstack((balls_camera_frame, i_array))
-                comp_i_array = np.array([comp_x, comp_y, comp_z]) / 1000.0
+                comp_i_array = np.array([comp_x, comp_y, comp_z])
+                comp_i_array = comp_i_array/1000  # Convert to meters
                 compensated_bcf = np.vstack((compensated_bcf, comp_i_array))
         self.balls_in_camera_frame = balls_camera_frame
         self.compensated_balls_in_camera_frame = compensated_bcf
@@ -243,6 +310,8 @@ class Vision(Node):
         """Drop a marker at the detected ball location in RViz."""
         if self.balls_in_camera_frame is not None:
             for i in self.balls_in_camera_frame:
+                # self.get_logger().info(
+                #     f"Dropping marker at {i[0], i[1], i[2]}")
                 x = i[0]
                 y = i[1]
                 z = i[2]
@@ -250,19 +319,22 @@ class Vision(Node):
                 self.ball_marker_publisher.publish(marker)
 
     def publish_ball_transform(self):
-        """Publish the transform of the detected ball in the robot base frame."""
+        """Publish transform of the detected ball in the robot base frame."""
         if self.balls_in_camera_frame is not None:
             for i in self.balls_in_camera_frame:
                 x = i[0]
                 y = i[1]
                 z = i[2]
                 camera_to_ball_transform = TransformStamped()
-                camera_to_ball_transform.header.stamp = self.get_clock().now().to_msg()
-                camera_to_ball_transform.header.frame_id = 'camera_color_optical_frame'
+                camera_to_ball_transform.header.stamp = \
+                    self.get_clock().now().to_msg()
+                camera_to_ball_transform.header.frame_id = \
+                    'camera_color_optical_frame'
                 camera_to_ball_transform.child_frame_id = 'ball'
                 camera_to_ball_transform.transform.translation.x = x
                 camera_to_ball_transform.transform.translation.y = y
                 camera_to_ball_transform.transform.translation.z = z
+
                 self.tf_broadcaster.sendTransform(camera_to_ball_transform)
 
         if self.compensated_balls_in_camera_frame is not None:
@@ -271,9 +343,12 @@ class Vision(Node):
                 y = i[1]
                 z = i[2]
                 camera_to_ball_transform = TransformStamped()
-                camera_to_ball_transform.header.stamp = self.get_clock().now().to_msg()
-                camera_to_ball_transform.header.frame_id = 'camera_color_optical_frame'
-                camera_to_ball_transform.child_frame_id = 'ball_compensated'
+                camera_to_ball_transform.header.stamp = \
+                    self.get_clock().now().to_msg()
+                camera_to_ball_transform.header.frame_id = \
+                    'camera_color_optical_frame'
+                camera_to_ball_transform.child_frame_id = \
+                    'ball_compensated'
                 camera_to_ball_transform.transform.translation.x = x
                 camera_to_ball_transform.transform.translation.y = y
                 camera_to_ball_transform.transform.translation.z = z
@@ -281,17 +356,17 @@ class Vision(Node):
 
     def publish_target_transform(self):
         """Offset the target marker by a distance."""
+        # Look up tag15 transform
         try:
             tag15_transform = self.tf_buffer.lookup_transform(
-                'camera_color_optical_frame', 'tag_15', rclpy.time.Time()
-            )
+                'camera_color_optical_frame', 'tag_15', rclpy.time.Time())
+
             tag15_dx = tag15_transform.transform.translation.x
             tag15_dy = tag15_transform.transform.translation.y
             tag15_dz = tag15_transform.transform.translation.z
 
-            comp_dx, comp_dy, comp_dz = compensate_ball_radius(
-                dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03
-            )
+            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(
+                dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03)
 
             target_transform = TransformStamped()
             target_transform.header.stamp = self.get_clock().now().to_msg()
@@ -300,9 +375,11 @@ class Vision(Node):
             target_transform.transform.translation.x = comp_dx
             target_transform.transform.translation.y = comp_dy
             target_transform.transform.translation.z = comp_dz
+
             self.tf_broadcaster.sendTransform(target_transform)
-        except Exception as e:
-            self.get_logger().debug('Error looking up tag_15 transform: {}'.format(e))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException) as e:
+            self.get_logger().debug(f'Error looking up tag_15 transform: {e}')
 
     def timer_callback(self):
         """Timer callback to publish transforms and markers."""
