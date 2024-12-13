@@ -53,7 +53,7 @@ class MotionPlanningInterface():
         """
         Move arm to desired joint values.
 
-        Args:
+        Args
         ----
         joint_values (list): list of joint values to move to
         start_config (Pose): start configuration of the robot
@@ -233,7 +233,7 @@ class MotionPlanningInterface():
 
         Args
         ----
-        name (str): The name of the trajectory to retrieve.
+            name (str): The name of the trajectory to retrieve.
 
         Returns
         -------
@@ -248,14 +248,14 @@ class MotionPlanningInterface():
 
         Args
         ----
-        named_configuration (str): The name of the target configuration.
-            Joint 1 (Shoulder Pan)
-            Joint 2 (Shoulder Lift)
-            Joint 3 (Elbow)
-            Joint 4 (Wrist 1)
-            Joint 5 (Wrist 2)
-            Joint 6 (Wrist 3)
-            Joint 7 (Wrist 4)
+            named_configuration (str): The name of the target configuration.
+                Joint 1 (Shoulder Pan)
+                Joint 2 (Shoulder Lift)
+                Joint 3 (Elbow)
+                Joint 4 (Wrist 1)
+                Joint 5 (Wrist 2)
+                Joint 6 (Wrist 3)
+                Joint 7 (Wrist 4)
 
         Returns
         -------
@@ -287,11 +287,11 @@ class MotionPlanningInterface():
 
         Args
         ----
-        named_configuration (str): The name of the target configuration.
-        start_pose (Pose, optional): Starting pose of the robot's \
-            end-effector. Uses current pose if None.
-        execute (bool, optional): Execute the trajectory if True. \
-            Defaults to False.
+            named_configuration (str): The name of the target configuration.
+            start_pose (Pose, optional): Starting pose of the robot's \
+                end-effector. Uses current pose if None.
+            execute (bool, optional): Execute the trajectory if True. \
+                Defaults to False.
 
         Returns
         -------

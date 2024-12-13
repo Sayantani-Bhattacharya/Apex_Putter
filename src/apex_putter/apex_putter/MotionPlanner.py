@@ -85,6 +85,7 @@ from tf2_ros.transform_listener import TransformListener
 
 
 class MotionPlanner():
+
     def __init__(self, node: Node, base_frame: str, end_effector_frame: str):
         """
         Initialize the MotionPlanner class.
@@ -92,8 +93,10 @@ class MotionPlanner():
         Args:
         ----
         node (Node): The running ROS node used to interface with ROS.
-        base_frame (str): The reference frame for motion planning.
-        end_effector_frame (str): The frame of the robot's end effector.
+        base_frame (str): The body frame of the robot.
+        end_effector_frame (str): The frame of the end effector.
+        joint_state_topic (str): The target joint state topic.
+        group_name (str): Name of planning group.
 
         """
         self.node = node
@@ -114,13 +117,13 @@ class MotionPlanner():
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self.node)
 
-        # Default workspace bounds
+        # Franka workspace (or just default 111?)
         self.workspace_min = Vector3(x=-0.855, y=-0.855, z=0.0)
         self.workspace_max = Vector3(x=0.855, y=0.855, z=1.19)
 
         # Named configurations
         self.configurations = {
-            # Default home configuration
+            # Default home configuration from the franka documentation
             'home': (
                 ['fer_joint1', 'fer_joint2', 'fer_joint3', 'fer_joint4',
                  'fer_joint5', 'fer_joint6', 'fer_joint7'],
@@ -138,41 +141,57 @@ class MotionPlanner():
                                max_acceleration_scaling_factor=0.1,
                                execute: bool = False):
         """
-        Plan a path from the current joint configuration to a specified joint configuration.
+        Plan a path from any valid starting joint configuration to any \
+            valid goal joint configuration.
 
-        Args:
-            joint_name (list[str]): A list of joint names.
-            joint_values (list[float]): A list of desired joint positions.
-            group_name (str): The planning group name.
-            start_state (RobotState): The starting robot state. Uses current state if None.
-            max_velocity_scaling_factor (float): Scaling factor for joint velocity (0-1).
-            max_acceleration_scaling_factor (float): Scaling factor for joint acceleration (0-1).
-            execute (bool): If True, execute the planned trajectory immediately.
+        Args
+        ----
+            joint_name: A list of joint names.
+            joint_values: A list of joint positions to move to.
+            start_state: The starting robot state. Defaults to None. \
+                Uses current state if None.
+            max_velocity_scaling_factor: Velocity scaling factor. \
+                Defaults to 0.1.
+            max_acceleration_scaling_factor: Acceleration scaling factor. \
+                Defaults to 0.1.
+            execute: Whether to execute the trajectory. Defaults to False.
 
         Returns
         -------
-            moveit_msgs.msg.RobotTrajectory or None:
-                The planned or executed trajectory, or None on failure.
+            the planned trajectory
 
         """
+        # define goal joint constriants
         joint_constraints = []
         for i in range(len(joint_name)):
-            constraint_i = JointConstraint(
-                joint_name=joint_name[i],
-                position=joint_values[i],
-                tolerance_above=0.0001,
-                tolerance_below=0.0001
-            )
-            joint_constraints.append(constraint_i)
+            if group_name == 'fer_manipulator':
+                constraint_i = JointConstraint(
+                    joint_name=joint_name[i],
+                    position=joint_values[i],
+                    tolerance_above=0.0001,
+                    tolerance_below=0.0001
+                )
+                joint_constraints.append(constraint_i)
+            elif group_name == 'hand':
+                constraint_i = JointConstraint(
+                    joint_name=joint_name[i],
+                    position=joint_values[i],
+                    tolerance_above=0.0001,
+                    tolerance_below=0.0001
+                )
+                joint_constraints.append(constraint_i)
 
         self.node.get_logger().info(
             f'Goal joint Constraint: {joint_constraints}')
 
+        # wrap into GoalConstraints
         goal_constraints = Constraints(joint_constraints=joint_constraints)
+
         self.node.get_logger().info(f'{start_state}')
 
-        # Create MotionPlanRequest
+        motion_plan_request = MotionPlanRequest()
         if group_name == 'fer_manipulator':
+            # moveit plan request
             motion_plan_request = MotionPlanRequest(
                 workspace_parameters=WorkspaceParameters(
                     header=Header(
@@ -182,6 +201,7 @@ class MotionPlanner():
                     min_corner=self.workspace_min,
                     max_corner=self.workspace_max
                 ),
+                # start_state=start_state,
                 goal_constraints=[goal_constraints],
                 group_name=group_name,
                 allowed_planning_time=20.0,
@@ -190,6 +210,7 @@ class MotionPlanner():
                 max_acceleration_scaling_factor=max_acceleration_scaling_factor,
             )
         elif group_name == 'hand':
+            # moveit plan request
             motion_plan_request = MotionPlanRequest(
                 workspace_parameters=WorkspaceParameters(
                     header=Header(
@@ -202,14 +223,14 @@ class MotionPlanner():
                 allowed_planning_time=5.0,
                 num_planning_attempts=5,
             )
-        else:
-            self.node.get_logger().error('Unknown group name provided.')
-            return None
 
         self.node.get_logger().info('Sending goal.')
+        # --------------------   Begin Citation [1]   --------------------
         goal = MoveGroup.Goal(
             request=motion_plan_request,
-            planning_options=PlanningOptions(plan_only=(not execute)),
+            planning_options=PlanningOptions(
+                plan_only=(not execute)
+            ),
         )
         self.node.get_logger().info('Goal Sent.')
 
@@ -218,66 +239,69 @@ class MotionPlanner():
         result_response = await goal_handle.get_result_async()
         self.node.get_logger().info('Result received.')
         result = result_response.result
+        # --------------------  End Citation [1]   --------------------
         error_code = result.error_code
 
-        # Check for success
+        # translate error code in MoveItErrorCodes
         if error_code.val != MoveItErrorCodes.SUCCESS:
-            self.node.get_logger().error(
-                f'Planning failed with error code: {error_code.val}',
-                f'message: {error_code.message}, source: {error_code.source}')
+            self.node.get_logger().error(f'Planning failed with error code: {
+                error_code.val}, message: {error_code.message}, source: {error_code.source}')
             return None
 
         if execute:
             return result.executed_trajectory
         else:
-            self.node.get_logger().info(f'Planned trajectory: {result.planned_trajectory}')
+            self.node.get_logger().info(f'Planned trajectory: \
+            {result.planned_trajectory}')
             return result.planned_trajectory
 
     async def plan_pose_async(self,
                               group_name,
                               start_state: RobotState,
-                              goal_position=None,
-                              goal_orientation=None,
+                              goal_position=None, goal_orientation=None,
                               max_velocity_scaling_factor=0.1,
                               max_acceleration_scaling_factor=0.1,
                               execute=False):
         """
-        Plan a path to reach a target pose defined by position and/or orientation.
+        Plans and optionally executes robot motion to reach target pose in \
+            workspace coordinates.
 
         Args:
-            group_name (str): The planning group name.
-            start_state (RobotState): The starting robot state. Uses current state if None.
-            goal_position (Point or iterable of floats): The desired end-effector position.
-                If an iterable of floats is provided (e.g. [x, y, z]), it is converted to a Point.
-                If None, orientation-only constraints are used.
-            goal_orientation (Quaternion): The desired end-effector orientation.
-                If None, position-only constraints are used.
-            max_velocity_scaling_factor (float): Scaling factor for joint velocity (0-1).
-            max_acceleration_scaling_factor (float): Scaling factor for joint acceleration (0-1).
-            execute (bool): If True, execute the planned trajectory immediately.
+        ----
+        goal_position (Point): Target position in base frame. \
+                                None for orientation-only control.
+        goal_orientation (Quaternion): Target orientation in base frame. \
+                                        None for position-only control.
+        start_state (Pose, optional): Starting pose. \
+                                    Uses current state if None.
+        max_velocity_scaling_factor (float, optional): \
+                                Velocity scaling (0-1). Defaults to 0.1.
+        max_acceleration_scaling_factor (float, optional): \
+                                Acceleration scaling (0-1). Defaults to 0.1.
+        execute (bool, optional): Execute trajectory if True. \
+                                    Defaults to False.
+        group_name (str): Name of group of joints we are changing.
 
-        Returns
-        -------
-            moveit_msgs.msg.RobotTrajectory or None: The planned or executed trajectory,
-                                                        or None on failure.
+        Return:
+        ------
+            RobotTrajectory: Executed trajectory if execute=True, \
+                otherwise planned trajectory.
 
         """
+        # define goal constraints
         position_constraints = []
         orientation_constraints = []
 
-        if goal_position is not None and not isinstance(goal_position, Point):
+        # Wrap into point class if provided a list
+        if type(goal_position) is not Point:
+            self.node.get_logger().info(f'None point type goal position provided: {
+                type(goal_position)} with val: {goal_position}.')
+            goal_position = Point(
+                x=goal_position[0], y=goal_position[1], z=goal_position[2])
             self.node.get_logger().info(
-                f'Non-Point type for goal_position provided: {type(goal_position)}',
-                f'with val: {goal_position}.'
-            )
-            goal_position = Point(x=goal_position[0],
-                                  y=goal_position[1],
-                                  z=goal_position[2])
-            self.node.get_logger().info(
-                f'Converted to Point type goal_position: {goal_position}'
-            )
+                f'Converted to point type goal position: {goal_position}')
 
-        # Position constraint
+        # position constraint
         if goal_position is not None:
             position_constraint = PositionConstraint(
                 header=Header(
@@ -296,8 +320,7 @@ class MotionPlanner():
                 weight=1.0
             )
             position_constraints.append(position_constraint)
-
-        # Orientation constraint
+        # orientation constraint
         if goal_orientation is not None:
             orientation_constraint = OrientationConstraint(
                 header=Header(
@@ -313,13 +336,13 @@ class MotionPlanner():
             )
             orientation_constraints.append(orientation_constraint)
 
+        # wrap into GoalConstraints
         goal_constraints = Constraints(
             position_constraints=position_constraints,
-            orientation_constraints=orientation_constraints
-        )
+            orientation_constraints=orientation_constraints)
 
         self.node.get_logger().info(f'{goal_constraints}')
-
+        # motion plan request msg
         motion_plan_request = MotionPlanRequest(
             workspace_parameters=WorkspaceParameters(
                 header=Header(
@@ -340,19 +363,22 @@ class MotionPlanner():
 
         goal = MoveGroup.Goal(
             request=motion_plan_request,
-            planning_options=PlanningOptions(plan_only=(not execute))
+            planning_options=PlanningOptions(
+                plan_only=(not execute)
+            ),
         )
 
+        # boilerplate
         goal_handle = await self.move_group_action_client.send_goal_async(goal)
         result_response = await goal_handle.get_result_async()
         result = result_response.result
         error_code = result.error_code
 
+        # translate error code in MoveItErrorCodes
         if error_code.val != MoveItErrorCodes.SUCCESS:
             self.node.get_logger().error(
                 f'Planning failed with error code: {error_code.val}')
             return None
-
         if execute:
             return result.executed_trajectory
         else:
@@ -454,19 +480,20 @@ class MotionPlanner():
 
     def set_named_config(self, named_configuration, joint_names, joint_values):
         """
-        Store a named joint configuration.
+        Set a named configuration with the given joint names and values.
+
+        Test_joint_values = [0.0, -0.8, 0.2, -1.4, 0.1, 1.0, -0.4]
 
         Args:
         ----
-        named_configuration (str): The name under which to store the configuration.
-        joint_names (list[str]): The list of joint names.
-        joint_values (list[float]): The list of corresponding joint values.
+        named_configuration (str): The name of the target configuration.
+        joint_names (list[str]): List of joint names.
+        joint_values (list[str]): List of joint values.
 
         """
         self.node.get_logger().info(
-            f"Setting named configuration '{named_configuration}' "
-            f'with: {joint_names} to {joint_values}'
-        )
+            f"Setting named configuration '{named_configuration}' \
+            with: {joint_names} to {joint_values}")
         self.configurations[named_configuration] = (joint_names, joint_values)
 
     async def plan_to_named_config_async(self, named_configuration,
@@ -531,12 +558,12 @@ class MotionPlanner():
 
     def save_trajectory(self, name, trajectory):
         """
-        Save a trajectory under a specified name.
+        Save a trajectory with a specified name.
 
         Args:
         ----
-        name (str): The name under which to save the trajectory.
-        trajectory (moveit_msgs.msg.RobotTrajectory): The trajectory to be saved.
+        name (str): The name to store the trajectory under.
+        trajectory (RobotTrajectory): The planned trajectory to save.
 
         """
         self.saved_trajectories[name] = trajectory

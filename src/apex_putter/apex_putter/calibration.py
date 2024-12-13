@@ -3,7 +3,6 @@ from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 from geometry_msgs.msg import Pose, TransformStamped
 
 import numpy as np
-
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
@@ -14,8 +13,6 @@ import tf_transformations
 
 
 class Calibrator(Node):
-    """Provide a calibrator node for performing robot-camera calibration."""
-
     def __init__(self):
         super().__init__('calibrator')
 
@@ -27,16 +24,16 @@ class Calibrator(Node):
 
         self.robot_base_frame = self.get_parameter(
             'robot_base_frame'
-        ).get_parameter_value().string_value
+            ).get_parameter_value().string_value
         self.robot_ee_frame = self.get_parameter(
             'robot_ee_frame'
-        ).get_parameter_value().string_value
+            ).get_parameter_value().string_value
         self.camera_base_frame = self.get_parameter(
             'camera_base_frame'
-        ).get_parameter_value().string_value
+            ).get_parameter_value().string_value
         self.camera_target_frame = self.get_parameter(
             'camera_target_frame'
-        ).get_parameter_value().string_value
+            ).get_parameter_value().string_value
 
         self.robot_points = []
         self.camera_points = []
@@ -74,7 +71,7 @@ class Calibrator(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-        # Service to get transform
+        # Add new service for getting transform
         self.get_transform_service = self.create_service(
             Trigger,
             'get_calibrated_transform',
@@ -82,7 +79,7 @@ class Calibrator(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-        # TF broadcasters
+        # Add tf broadcaster for publishing calibration transform
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         self.static_tf_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
         self.calibration_transform = None
@@ -91,7 +88,7 @@ class Calibrator(Node):
         self.generate_all_poses()
         self.pose_counter = 0
         self.broadcast_extension()
-        self.get_logger().info('Calibrator node initialized.')
+        self.get_logger().info('Calibrator node initialized')
 
     def broadcast_extension(self):
         """Broadcast the extension transform."""
@@ -104,18 +101,16 @@ class Calibrator(Node):
         self.static_tf_broadcaster.sendTransform(extension_transform)
 
     async def move_callback(self, request, response):
-        """Move to the next pose asynchronously."""
+        """Async service callback for moving to the next pose."""
         if self.pose_counter >= len(self.pose_list):
             response.success = False
             response.message = 'All poses visited'
             return response
 
         current_pose = self.pose_list[self.pose_counter]
-        success = await self.MPI.move_arm_pose(
-            current_pose,
-            max_velocity_scaling_factor=0.25,
-            max_acceleration_scaling_factor=0.2
-        )
+        success = await self.MPI.move_arm_pose(current_pose,
+                                               max_velocity_scaling_factor=0.25,
+                                               max_acceleration_scaling_factor=0.2)
 
         if success:
             self.pose_counter += 1
@@ -129,11 +124,11 @@ class Calibrator(Node):
 
     def generate_all_poses(self):
         """Generate 18 poses in a grid pattern with specified ranges."""
-        # Ranges: x=[0.4,0.55], y=[-0.45,0.4], z=[0.3,0.5]
-        # x: 2 points, y: 3 points, z: 2 points => 2*3*2=12 (adjust as needed)
-        x = np.linspace(0.4, 0.55, 2)
-        y = np.linspace(-0.45, 0.4, 3)
-        z = np.linspace(0.3, 0.5, 2)
+        # Generate poses by linspacing in x = [0.4, 0.6], y = [-0.4, 0.4], z = [0.2, 0.5]
+        # Create 18 poses by adjusting the number of points in each dimension
+        x = np.linspace(0.4, 0.55, 2)  # 3 points
+        y = np.linspace(-0.45, 0.4, 3)  # 3 points
+        z = np.linspace(0.3, 0.5, 2)  # 2 points to get 3*3*2 = 18 poses
 
         self.pose_list = []
         for xi in x:
@@ -142,22 +137,23 @@ class Calibrator(Node):
                     self.pose_list.append(self.generate_pose(xi, yi, zi))
 
     def generate_pose(self, x, y, z):
-        """Generate a pose with position and a 180° rotation about the z-axis."""
+        """Generate a pose with position and orientation (180° rotation about z-axis)."""
         pose = Pose()
         pose.position.x = x
         pose.position.y = y
         pose.position.z = z
 
-        # Orientation with 180° rotation about z-axis
+        # Set orientation to pointing downward with 180° rotation about z-axis
+        # This is equivalent to rotating the end-effector 180° about its z-axis
+        # from the downward-pointing position
         pose.orientation.x = 1.0
-        pose.orientation.y = 0.0
+        pose.orientation.y = 0.0  # Negative y to rotate 180° about z
         pose.orientation.z = 0.2
         pose.orientation.w = 0.0
 
         return pose
 
     def save_data_callback(self, request, response):
-        """Save the current robot end-effector and camera target point pairs."""
         try:
             # Get robot end-effector position
             robot_transform = self.tf_buffer.lookup_transform(
@@ -191,6 +187,7 @@ class Calibrator(Node):
 
             response.success = True
             response.message = f'Saved point pair {len(self.robot_points)}'
+
         except Exception as e:
             response.success = False
             response.message = f'Failed to save points: {str(e)}'
@@ -198,7 +195,6 @@ class Calibrator(Node):
         return response
 
     def calibrate_callback(self, request, response):
-        """Perform calibration using the collected point pairs."""
         if len(self.robot_points) < 3:
             response.success = False
             response.message = 'Need at least 3 point pairs for calibration'
@@ -209,8 +205,8 @@ class Calibrator(Node):
             # Convert to transform and store it
             self.calibration_transform = self.matrix_to_transform(R, t)
 
-            # Start broadcasting the transform at 10Hz
-            self.create_timer(0.1, self.broadcast_transform)
+            # Start broadcasting the transform
+            self.create_timer(0.1, self.broadcast_transform)  # 10Hz broadcast rate
 
             response.success = True
             response.message = f'Calibration successful. R:\n{R}\nt:\n{t}'
@@ -221,7 +217,7 @@ class Calibrator(Node):
         return response
 
     def calibrate(self):
-        """Compute the calibration transform from robot_points to camera_points."""
+        # Convert points to numpy arrays
         P = np.array(self.robot_points)
         Q = np.array(self.camera_points)
 
@@ -232,9 +228,13 @@ class Calibrator(Node):
         P_centered = P - p_centroid
         Q_centered = Q - q_centroid
 
-        # Compute covariance
+        # Calculate covariance matrix
         H = P_centered.T @ Q_centered
+
+        # SVD decomposition
         U, S, Vt = np.linalg.svd(H)
+
+        # Calculate rotation matrix
         R = Vt.T @ U.T
 
         # Ensure right-handed coordinate system
@@ -242,25 +242,27 @@ class Calibrator(Node):
             Vt[-1, :] *= -1
             R = Vt.T @ U.T
 
-        t = np.array(q_centroid - R @ p_centroid, dtype=float)
+        # Calculate translation
+        t = q_centroid - R @ p_centroid
+
         return R, t
 
     def matrix_to_transform(self, R, t):
-        """Convert R and t into a TransformStamped message."""
+        """Convert rotation matrix and translation vector to TransformStamped message."""
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = self.camera_base_frame
         transform.child_frame_id = 'calibrated_base'
 
+        # Set translation
         transform.transform.translation.x = float(t[0])
         transform.transform.translation.y = float(t[1])
         transform.transform.translation.z = float(t[2])
 
+        # Convert rotation matrix to quaternion
         q = tf_transformations.quaternion_from_matrix(
-            np.vstack([
-                np.hstack([R, np.zeros((3, 1))]),
-                [0, 0, 0, 1]
-            ])
+            np.vstack([np.hstack([R, np.zeros((3, 1))]),
+                      [0, 0, 0, 1]])
         )
 
         transform.transform.rotation.x = float(q[0])
@@ -271,24 +273,23 @@ class Calibrator(Node):
         return transform
 
     def broadcast_transform(self):
-        """Broadcast the calibration transform at a fixed rate."""
+        """Timer callback to broadcast the calibration transform."""
         if self.calibration_transform is not None:
             self.calibration_transform.header.stamp = self.get_clock().now().to_msg()
             self.tf_broadcaster.sendTransform(self.calibration_transform)
 
     def get_transform_callback(self, request, response):
-        """Get the transform from robot_base_tag to calibrated_base if available."""
+        """Service to get transform from robot_base_tag to calibrated_base."""
         try:
             transform = self.tf_buffer.lookup_transform(
                 'robot_base_tag',
                 'calibrated_base',
                 rclpy.time.Time(),
-                rclpy.duration.Duration(seconds=1.0)
+                rclpy.duration.Duration(seconds=1.0)  # 1 second timeout
             )
+
             response.success = True
-            response.message = (
-                f'Transform from robot_base_tag to calibrated_base:\n{transform}'
-            )
+            response.message = f'Transform from robot_base_tag to calibrated_base:\n{transform}'
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
                 tf2_ros.ExtrapolationException) as e:
             response.success = False
@@ -298,7 +299,6 @@ class Calibrator(Node):
 
 
 def main(args=None):
-    """Initialize and run the calibrator node."""
     rclpy.init(args=args)
     calibrator = Calibrator()
     rclpy.spin(calibrator)
