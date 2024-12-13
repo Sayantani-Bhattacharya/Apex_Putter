@@ -1,3 +1,11 @@
+"""
+The MotionPlanningInterface class.
+
+The MPI integrates functionality from the RobotState, MotionPlanner,
+and PlanningScene class.
+
+"""
+
 from apex_putter.MotionPlanner import MotionPlanner
 from apex_putter.PlanningSceneClass import PlanningSceneClass
 from apex_putter.RobotState import RobotState
@@ -37,8 +45,25 @@ class MotionPlanningInterface():
         self.gripper_controller = 'fer_gripper'
 
     # MotionPlanner functions
-    async def move_arm_joints(self, joint_values, start_config=None, max_velocity_scaling_factor=0.1, max_acceleration_scaling_factor=0.1):
-        """Move arm to desired joint values."""
+    async def move_arm_joints(self,
+                              joint_values,
+                              start_config=None,
+                              max_velocity_scaling_factor=0.1,
+                              max_acceleration_scaling_factor=0.1):
+        """Move arm to desired joint values.
+
+        Args
+        ----
+            joint_values (list): list of joint values to move to
+            start_config (Pose): start configuration of the robot
+            max_velocity_scaling_factor (float): velocity scaling factor
+            max_acceleration_scaling_factor (float): acceleration scaling factor
+
+        Returns
+        -------
+            Executed trajectory of the robot
+
+        """
         if start_config is None:
             start_state = self.RobotState.get_robot_state()
         else:
@@ -58,14 +83,33 @@ class MotionPlanningInterface():
             controller=self.arm_controller
         )
 
-    async def move_arm_pose(self, goal_pose: Pose, start_pose: Pose = None, max_velocity_scaling_factor=0.1, max_acceleration_scaling_factor=0.1):
-        """Move arm to pose for 'fer_link8'."""
+    async def move_arm_pose(self, goal_pose:
+                            Pose, start_pose:
+                            Pose = None, max_velocity_scaling_factor=0.1,
+                            max_acceleration_scaling_factor=0.1):
+        """Move arm to pose for 'fer_link8'.
+
+        Args
+        ----
+            goal_pose (Pose): goal pose
+            start_pose (Pose): start pose
+            max_velocity_scaling_factor (float): velocity scaling factor
+            max_acceleration_scaling_factor (float): acceleration scaling factor
+
+        Returns
+        -------
+            Executed trajectory of the robot
+
+        """
         goal_position = goal_pose.position
         goal_orientation = goal_pose.orientation
         if start_pose is None:
             start_state = self.RobotState.get_robot_state()
         else:
-            start_state = await self.RobotState.compute_inverse_kinematics(curr_pose=start_pose, group_name=self.arm_move_group)
+            start_state = await self.RobotState.compute_inverse_kinematics(
+                curr_pose=start_pose,
+                group_name=self.arm_move_group
+            )
         traj = await self.MotionPlanner.plan_pose_async(
             group_name=self.arm_move_group,
             start_state=start_state,
@@ -79,12 +123,32 @@ class MotionPlanningInterface():
             controller=self.arm_controller
         )
 
-    async def move_arm_cartesian(self, waypoints, start_pose=None, max_velocity_scaling_factor=0.1, max_acceleration_scaling_factor=0.1, avoid_collisions=True):
-        """Move arm using a cartesian path."""
+    async def move_arm_cartesian(self,
+                                 waypoints,
+                                 start_pose=None,
+                                 max_velocity_scaling_factor=0.1,
+                                 max_acceleration_scaling_factor=0.1,
+                                 avoid_collisions=True):
+        """Move arm using a cartesian path.
+
+        Args
+        ----
+            waypoints (Pose[]): list of poses to move along trajectory
+            start_pose (Pose): start pose
+            max_velocity_scaling_factor (float): velocity scaling factor
+            max_acceleration_scaling_factor (float): acceleration scaling factor
+
+        Returns
+        -------
+            Executed trajectory of the robot
+
+        """
         if start_pose is None:
             start_pose = await self.RobotState.get_current_end_effector_pose()
-        start_state = await self.RobotState.compute_inverse_kinematics(curr_pose=start_pose.pose, group_name=self.arm_move_group)
-        print("start_state passed.")
+        start_state = await self.RobotState.compute_inverse_kinematics(
+            curr_pose=start_pose.pose,
+            group_name=self.arm_move_group
+        )
         traj = await self.MotionPlanner.plan_cartesian_path_async(
             waypoints=waypoints,
             group_name=self.arm_move_group,
@@ -93,13 +157,19 @@ class MotionPlanningInterface():
             max_acceleration_scaling_factor=max_acceleration_scaling_factor,
             avoid_collisions=avoid_collisions
         )
-        print("traj passed.")
         return await self.MotionPlanner.execute_trajectory_async(
             trajectory=traj,
             controller=self.arm_controller
         )
 
     async def open_gripper(self):
+        """Open the Franka gripper.
+
+        Returns
+        -------
+            Executed trajectory of the robot
+
+        """
         start_state = self.RobotState.get_robot_state()
         traj = await self.MotionPlanner.plan_joint_async(
             self.hand_joint_names,
@@ -115,6 +185,17 @@ class MotionPlanningInterface():
         )
 
     async def close_gripper(self, width):
+        """Close the franka gripper.
+
+        Args
+        ----
+            width (float): width of the grippers
+
+        Returns
+        -------
+            Executed trajectory of the robot
+
+        """
         start_state = self.RobotState.get_robot_state()
         traj = await self.MotionPlanner.plan_joint_async(
             self.hand_joint_names,
@@ -221,36 +302,109 @@ class MotionPlanningInterface():
         )
 
     async def get_current_end_effector_pose(self):
+        """
+        Get the current end effector pose.
+
+        Returns
+        -------
+            Pose of the end effector
+
+        """
         return await self.RobotState.get_current_end_effector_pose()
 
     async def get_transform(self, base_frame, end_frame):
+        """
+        Get the current end effector pose.
+
+        Args
+        ----
+        base_frame (string): name of the parent frame
+        end_frame (string): name of the child frame
+
+        Returns
+        -------
+            Transform between base frame and end frame
+
+        """
         return await self.RobotState.get_transform(base_frame, end_frame)
 
     # PlanningScene functions
-    async def add_box(self, box_id, size, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
+    async def add_box(self,
+                      box_id,
+                      size,
+                      position,
+                      orientation=(0.0, 0.0, 0.0, 1.0),
+                      frame_id='base'):
+        """
+        Add a box in the planning scene.
+
+        Args
+        ----
+        box_id (string): id of the box
+        size (tuple): dimensions of the box (x, y, z)
+        position (tuple): position of box (x, y, z)
+        orientation (Quaternion): orientaion of the box
+        frame_id (string): frame in which the box is published
+
+        """
         return await self.PlanningScene.add_box_async(
             box_id, size, position, orientation, frame_id
         )
 
     async def remove_box(self, box_id, frame_id='base'):
+        """
+        Remove box from the planning scene.
+
+        Args
+        ----
+        box_id (string): id of the box
+        frame_id (string): frame in which the box is published
+
+        """
         return await self.PlanningScene.remove_box_async(
             box_id,
             frame_id
         )
 
     async def attach_object(self, object_id, link_name):
+        """
+        Attach an object to a link in the planning scene.
+
+        Args
+        ----
+        object_id (string): id of the object
+        link_name (string): name of the link
+
+        """
         return await self.PlanningScene.attach_object_async(
             object_id,
             link_name
         )
 
     async def detach_object(self, object_id, link_name):
+        """
+        Detach an object from a link in the planning scene.
+
+        Args
+        ----
+        object_id (string): id of the object
+        link_name (string): name of the link
+
+        """
         return await self.PlanningScene.detach_object_async(
             object_id,
             link_name
         )
 
     async def load_scene_from_parameters(self, parameters):
+        """
+        Load a planning scene from parameters.
+
+        Args
+        ----
+        parameters (list): list of planning scene objects
+
+        """
         return await self.PlanningScene.load_scene_from_parameters_async(
             parameters
         )

@@ -22,7 +22,8 @@ def generate_launch_description():
 
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config_file',
-        default_value=os.path.join(bringup_dir, 'config', 'golf_club_fixed_tool.rviz'),
+        default_value=os.path.join(bringup_dir, 'config',
+                                   'golf_club_fixed_tool.rviz'),
         description='Full path to the RVIZ config file to use')
 
     declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
@@ -42,8 +43,9 @@ def generate_launch_description():
 
     declare_urdf_cmd = DeclareLaunchArgument(
         'urdf_file',
-        default_value=os.path.join(bringup_dir, 'urdf', 'golf_club_fixed.urdf'),
-        description='Path to the URDF file')
+        default_value=os.path.join(bringup_dir,
+                                   'urdf', 'golf_club_fixed.urdf'),
+        description='Whether to start RVIZ')
 
     start_robot_state_publisher_cmd = Node(
         condition=IfCondition(use_robot_state_pub),

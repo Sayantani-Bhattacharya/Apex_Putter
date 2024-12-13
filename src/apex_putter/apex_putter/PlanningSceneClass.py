@@ -1,4 +1,38 @@
+"""
+PlanningSceneClass maintains the planning scene.
+
+The PlanningSceneClass allows for the simulation environment
+in Rviz to be manipulated by adding simulated objects that
+are considered during motion planning.
+
+Clients
+-------
+    + /apply_planning_scene (ApplyPlanningScene) - Service client
+        for applying changes to the planning scene
+
+Methods
+-------
+    + add_box_async() -
+        Add box to planning scene.
+    + remove_box_async() -
+        Remove box from planning scene.
+    + add_sphere_async() -
+        Add sphere to planning scene.
+    + add_sphere() -
+        Synchronous wrapper for add_sphere_async()
+    + remove_box() -
+        Synchronous wrapper for remove_box_async()
+    + attach_box_async() -
+        Attach a box to a link.
+    + detach_box_async() -
+        Detach a box from a link.
+    + load_scene_from_parameters_async() -
+        Load a scene from list of parameters.
+
+"""
+
 from asyncio import Future
+
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject
 from moveit_msgs.msg import PlanningScene as PlanningMsg
@@ -44,7 +78,18 @@ class PlanningSceneClass:
                             position,
                             orientation=(0.0, 0.0, 0.0, 1.0),
                             frame_id='base'):
-        """Add a box to the planning scene asynchronously."""
+        """
+        Add a box in the planning scene.
+
+        Args
+        ----
+        box_id (string): id of the box
+        size (tuple): dimensions of the box (x, y, z)
+        position (tuple): position of box (x, y, z)
+        orientation (Quaternion): orientaion of the box
+        frame_id (string): frame in which the box is published
+
+        """
         collision_object = CollisionObject()
         collision_object.id = box_id
         collision_object.header.frame_id = frame_id
@@ -69,7 +114,15 @@ class PlanningSceneClass:
         return result
 
     async def remove_box_async(self, box_id, frame_id='base'):
-        """Remove a box from the planning scene synchronously."""
+        """
+        Remove box from the planning scene asynchronously.
+
+        Args
+        ----
+        box_id (string): id of the box
+        frame_id (string): frame in which the box is published
+
+        """
         collision_object = CollisionObject()
         collision_object.id = box_id
         collision_object.header.frame_id = frame_id
@@ -79,12 +132,24 @@ class PlanningSceneClass:
         result = await self._apply_collision_object(collision_object)
         return result
 
-    async def add_sphere_async(self, sphere_id, radius, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
+    async def add_sphere_async(self,
+                               sphere_id,
+                               radius,
+                               position,
+                               orientation=(0.0, 0.0, 0.0, 1.0),
+                               frame_id='base'):
         """
-        Adds a sphere to the planning scene asynchronously.
-        """
-        self.node.get_logger().info("add_sphere_async()")
+        Add a sphere in the planning scene async.
 
+        Args
+        ----
+        sphere_id (string): id of the sphere
+        radius (radius): radius of the sphere
+        position (tuple): position of sphere
+        orientation (Quaternion): orientaion of the sphere
+        frame_id (string): frame in which the sphere is published
+
+        """
         collision_object = CollisionObject()
         collision_object.id = sphere_id
         collision_object.header.frame_id = frame_id
@@ -98,7 +163,8 @@ class PlanningSceneClass:
         # Define the sphere pose
         sphere_pose = Pose()
         sphere_pose.position.x, sphere_pose.position.y, sphere_pose.position.z = position
-        sphere_pose.orientation.x, sphere_pose.orientation.y, sphere_pose.orientation.z, sphere_pose.orientation.w = orientation
+        sphere_pose.orientation.x, sphere_pose.orientation.y, sphere_pose.orientation.z, \
+            sphere_pose.orientation.w = orientation
 
         collision_object.primitives = [sphere]
         collision_object.primitive_poses = [sphere_pose]
@@ -108,17 +174,29 @@ class PlanningSceneClass:
         result = await self._apply_collision_object(collision_object)
         return result
 
-    def add_sphere(self, sphere_id, radius, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
+    def add_sphere(self,
+                   sphere_id,
+                   radius,
+                   position,
+                   orientation=(0.0, 0.0, 0.0, 1.0),
+                   frame_id='base'):
         """
-        Adds a sphere to the planning scene synchronously.
-        This method creates an async task and returns a Future that you can wait on.
+        Add a sphere in the planning scene.
+
+        Args
+        ----
+        sphere_id (string): id of the sphere
+        radius (radius): radius of the sphere
+        position (tuple): position of sphere
+        orientation (Quaternion): orientaion of the sphere
+        frame_id (string): frame in which the sphere is published
+
         """
-        self.node.get_logger().info("add_sphere()")
         executor = rclpy.get_global_executor()
 
         if executor is None:
             raise RuntimeError(
-                "No executor is running. Make sure rclpy.init() has been called")
+                'No executor is running. Make sure rclpy.init() has been called')
 
         # Create a new future for this request
         self.future = Future()
@@ -137,14 +215,21 @@ class PlanningSceneClass:
 
         return self.future
 
-
     def remove_box(self, box_id, frame_id='base'):
-        self.node.get_logger().info("remove_box()")
+        """
+        Remove box from the planning scene.
+
+        Args
+        ----
+        box_id (string): id of the box
+        frame_id (string): frame in which the box is published
+
+        """
         executor = rclpy.get_global_executor()
 
         if executor is None:
             raise RuntimeError(
-                "No executor is running. Make sure rclpy.init() has been called")
+                'No executor is running. Make sure rclpy.init() has been called')
 
         # Create a new future for this request
         self.future = Future()
@@ -161,7 +246,15 @@ class PlanningSceneClass:
         return self.future
 
     async def attach_object_async(self, object_id, link_name):
-        """Attach a collision object to the robot's end-effector synchronously."""
+        """
+        Attach an object to a link in the planning scene.
+
+        Args
+        ----
+        object_id (string): id of the object
+        link_name (string): name of the link
+
+        """
         attached_object = AttachedCollisionObject()
         attached_object.link_name = link_name
         attached_object.object.id = object_id
@@ -182,7 +275,15 @@ class PlanningSceneClass:
         return result
 
     async def detach_object_async(self, object_id, link_name):
-        """Detach a collision object from the robot's end-effector synchronously."""
+        """
+        Detach an object from a link in the planning scene.
+
+        Args
+        ----
+        object_id (string): id of the object
+        link_name (string): name of the link
+
+        """
         attached_object = AttachedCollisionObject()
         attached_object.link_name = link_name
         attached_object.object.id = object_id
@@ -198,7 +299,14 @@ class PlanningSceneClass:
         return result
 
     async def load_scene_from_parameters_async(self, parameters):
-        """Load a planning scene from parameters synchronously."""
+        """
+        Load a planning scene from parameters.
+
+        Args
+        ----
+        parameters (list): list of planning scene objects
+
+        """
         for param in parameters:
             await self.add_box_async(
                 box_id=param['id'],
