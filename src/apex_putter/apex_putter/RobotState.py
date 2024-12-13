@@ -116,8 +116,10 @@ class RobotState:
         """
         Retrieve the most up-to-date end-effector pose from the robot.
 
-        Returns:
+        Returns
+        -------
             PoseStamped: The current end-effector pose.
+
         """
         try:
             transform = await self.tf_buffer.lookup_transform_async(
