@@ -7,10 +7,14 @@ import apex_putter.RobotState as RS
 from geometry_msgs.msg import Pose
 import math
 
-
 def htm_to_transform(htm: np.array) -> Transform:
     """
-    Convert a HTM to a Transform object
+    Converts a HTM to a Transform object.
+
+    Args:
+        htm format of the same (4x4 np.array): homogeneous transformation matrix.
+    Returns:
+        transform: Transfrom is msg type of tf publisher.
     """
     # Decompose the result
     translation, rotation, _, _ = decompose(htm)
@@ -28,9 +32,10 @@ def htm_to_transform(htm: np.array) -> Transform:
 
     return result
 
-
 def transform_to_htm(transform: Transform) -> np.array:
     '''
+    Converts a Transform to a HTM object.
+
     Args:
         transform: Transfrom is msg type of tf publisher.
     Returns:
@@ -52,7 +57,6 @@ def transform_to_htm(transform: Transform) -> np.array:
     htm[0:3, 0:3] = rotation_matrix
     htm[0:3, 3] = translation
     return htm
-
 
 def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) -> Transform:
     """
@@ -88,18 +92,20 @@ def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) 
 
     return result
 
-
 def obj_in_bot_frame(T_camObj):
     '''
-    Input(4x4 np.array): Camera-to-Ball transform  T_camObj
-    Output(4x4 np.array): T_objBot
-    Fixed: T_botCam    
+    For a fixed T_botCam value, used to transform frame 
+    from cam-obj to obj-bot.
+    Args:
+        T_camObj (4x4 np.array): Camera-to-Ball transform 
+    Returns:
+        Output(4x4 np.array): T_objBot
+      
     '''
     # Write the fixed frame transform here.
     T_botCam = np.array([0])
     T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
-
 
 def detected_obj_pose(T_camObj: Transform):
     '''
@@ -127,7 +133,10 @@ def detected_obj_pose(T_camObj: Transform):
 
 def compensate_ball_radius(dx,dy,dz, R=21):
     '''
-    Input:
+    Helper function to translate the pose from ball suface to ball's center,
+    considering it a sphere.
+
+    Args:
         (x_c, y_c, z_c) : camera pose
         (x_b, y_b, z_b) : ball pose
         R: Radius of ball
@@ -150,19 +159,18 @@ def compensate_ball_radius(dx,dy,dz, R=21):
     return x_r, y_r, z_r
 
 # Test functions
-
-
 def test():
+    '''
+    To test the above helper functions.
+    '''
     manipulator_pos = np.array([
         [0.7071, -0.7071, 0, 1],
         [0.7071, 0.7071, 0, 0.44454056],
         [0, 0, 1, 0.66401457],
         [0, 0, 0, 1]
     ])
-
     tranform = htm_to_transform(manipulator_pos)
     htm = transform_to_htm(tranform)
     print(htm)
-
 
 test()
