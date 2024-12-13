@@ -50,14 +50,15 @@ class MotionPlanningInterface():
                               start_config=None,
                               max_velocity_scaling_factor=0.1,
                               max_acceleration_scaling_factor=0.1):
-        """Move arm to desired joint values.
+        """
+        Move arm to desired joint values.
 
-        Args
+        Args:
         ----
-            joint_values (list): list of joint values to move to
-            start_config (Pose): start configuration of the robot
-            max_velocity_scaling_factor (float): velocity scaling factor
-            max_acceleration_scaling_factor (float): acceleration scaling factor
+        joint_values (list): list of joint values to move to
+        start_config (Pose): start configuration of the robot
+        max_velocity_scaling_factor (float): velocity scaling factor
+        max_acceleration_scaling_factor (float): acceleration scaling factor
 
         Returns
         -------
@@ -87,14 +88,15 @@ class MotionPlanningInterface():
                             Pose, start_pose:
                             Pose = None, max_velocity_scaling_factor=0.1,
                             max_acceleration_scaling_factor=0.1):
-        """Move arm to pose for 'fer_link8'.
+        """
+        Move arm to pose for 'fer_link8'.
 
         Args
         ----
-            goal_pose (Pose): goal pose
-            start_pose (Pose): start pose
-            max_velocity_scaling_factor (float): velocity scaling factor
-            max_acceleration_scaling_factor (float): acceleration scaling factor
+        goal_pose (Pose): goal pose
+        start_pose (Pose): start pose
+        max_velocity_scaling_factor (float): velocity scaling factor
+        max_acceleration_scaling_factor (float): acceleration scaling factor
 
         Returns
         -------
@@ -129,14 +131,15 @@ class MotionPlanningInterface():
                                  max_velocity_scaling_factor=0.1,
                                  max_acceleration_scaling_factor=0.1,
                                  avoid_collisions=True):
-        """Move arm using a cartesian path.
+        """
+        Move arm using a cartesian path.
 
         Args
         ----
-            waypoints (Pose[]): list of poses to move along trajectory
-            start_pose (Pose): start pose
-            max_velocity_scaling_factor (float): velocity scaling factor
-            max_acceleration_scaling_factor (float): acceleration scaling factor
+        waypoints (Pose[]): list of poses to move along trajectory
+        start_pose (Pose): start pose
+        max_velocity_scaling_factor (float): velocity scaling factor
+        max_acceleration_scaling_factor (float): acceleration scaling factor
 
         Returns
         -------
@@ -163,7 +166,8 @@ class MotionPlanningInterface():
         )
 
     async def open_gripper(self):
-        """Open the Franka gripper.
+        """
+        Open the Franka gripper.
 
         Returns
         -------
@@ -185,11 +189,12 @@ class MotionPlanningInterface():
         )
 
     async def close_gripper(self, width):
-        """Close the franka gripper.
+        """
+        Close the franka gripper.
 
         Args
         ----
-            width (float): width of the grippers
+        width (float): width of the grippers
 
         Returns
         -------
@@ -216,8 +221,8 @@ class MotionPlanningInterface():
 
         Args:
         ----
-            name (str): The name to store the trajectory under.
-            trajectory (RobotTrajectory): The planned trajectory to save.
+        name (str): The name to store the trajectory under.
+        trajectory (RobotTrajectory): The planned trajectory to save.
 
         """
         self.MotionPlanner.save_trajectory(name, trajectory)
@@ -228,7 +233,7 @@ class MotionPlanningInterface():
 
         Args
         ----
-            name (str): The name of the trajectory to retrieve.
+        name (str): The name of the trajectory to retrieve.
 
         Returns
         -------
@@ -243,14 +248,14 @@ class MotionPlanningInterface():
 
         Args
         ----
-            named_configuration (str): The name of the target configuration.
-                Joint 1 (Shoulder Pan)
-                Joint 2 (Shoulder Lift)
-                Joint 3 (Elbow)
-                Joint 4 (Wrist 1)
-                Joint 5 (Wrist 2)
-                Joint 6 (Wrist 3)
-                Joint 7 (Wrist 4)
+        named_configuration (str): The name of the target configuration.
+            Joint 1 (Shoulder Pan)
+            Joint 2 (Shoulder Lift)
+            Joint 3 (Elbow)
+            Joint 4 (Wrist 1)
+            Joint 5 (Wrist 2)
+            Joint 6 (Wrist 3)
+            Joint 7 (Wrist 4)
 
         Returns
         -------
@@ -267,9 +272,9 @@ class MotionPlanningInterface():
 
         Args:
         ----
-            named_configuration (str): The name of the target configuration.
-            joint_names (list[str]): List of joint names.
-            joint_values (list[str]): List of joint values.
+        named_configuration (str): The name of the target configuration.
+        joint_names (list[str]): List of joint names.
+        joint_values (list[str]): List of joint values.
 
         """
         self.MotionPlanner.set_named_config(named_configuration, joint_values)
@@ -282,11 +287,11 @@ class MotionPlanningInterface():
 
         Args
         ----
-            named_configuration (str): The name of the target configuration.
-            start_pose (Pose, optional): Starting pose of the robot's \
-                end-effector. Uses current pose if None.
-            execute (bool, optional): Execute the trajectory if True. \
-                Defaults to False.
+        named_configuration (str): The name of the target configuration.
+        start_pose (Pose, optional): Starting pose of the robot's \
+            end-effector. Uses current pose if None.
+        execute (bool, optional): Execute the trajectory if True. \
+            Defaults to False.
 
         Returns
         -------
@@ -338,7 +343,7 @@ class MotionPlanningInterface():
         """
         Add a box in the planning scene.
 
-        Args
+        Args:
         ----
         box_id (string): id of the box
         size (tuple): dimensions of the box (x, y, z)
@@ -355,7 +360,7 @@ class MotionPlanningInterface():
         """
         Remove box from the planning scene.
 
-        Args
+        Args:
         ----
         box_id (string): id of the box
         frame_id (string): frame in which the box is published
@@ -370,7 +375,7 @@ class MotionPlanningInterface():
         """
         Attach an object to a link in the planning scene.
 
-        Args
+        Args:
         ----
         object_id (string): id of the object
         link_name (string): name of the link
@@ -385,7 +390,7 @@ class MotionPlanningInterface():
         """
         Detach an object from a link in the planning scene.
 
-        Args
+        Args:
         ----
         object_id (string): id of the object
         link_name (string): name of the link
@@ -400,7 +405,7 @@ class MotionPlanningInterface():
         """
         Load a planning scene from parameters.
 
-        Args
+        Args:
         ----
         parameters (list): list of planning scene objects
 
