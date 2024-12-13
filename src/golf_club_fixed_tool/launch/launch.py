@@ -3,28 +3,27 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('golf_club_fixed_tool')
-    launch_dir = os.path.join(bringup_dir, 'launch')
 
     # Launch configuration variables specific to simulation
     rviz_config_file = LaunchConfiguration('rviz_config_file')
     use_robot_state_pub = LaunchConfiguration('use_robot_state_pub')
     use_joint_state_pub = LaunchConfiguration('use_joint_state_pub')
     use_rviz = LaunchConfiguration('use_rviz')
-    urdf_file= LaunchConfiguration('urdf_file')
+    urdf_file = LaunchConfiguration('urdf_file')
 
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config_file',
-        default_value=os.path.join(bringup_dir, 'config', 'golf_club_fixed_tool.rviz'),
+        default_value=os.path.join(bringup_dir, 'config',
+                                   'golf_club_fixed_tool.rviz'),
         description='Full path to the RVIZ config file to use')
 
     declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
@@ -44,7 +43,8 @@ def generate_launch_description():
 
     declare_urdf_cmd = DeclareLaunchArgument(
         'urdf_file',
-        default_value=os.path.join(bringup_dir, 'urdf', 'golf_club_fixed.urdf'),
+        default_value=os.path.join(bringup_dir,
+                                   'urdf', 'golf_club_fixed.urdf'),
         description='Whether to start RVIZ')
 
     start_robot_state_publisher_cmd = Node(
@@ -53,7 +53,7 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='screen',
-        #parameters=[{'use_sim_time': use_sim_time}],
+        # parameters=[{'use_sim_time': use_sim_time}],
         arguments=[urdf_file])
 
     start_joint_state_publisher_cmd = Node(
